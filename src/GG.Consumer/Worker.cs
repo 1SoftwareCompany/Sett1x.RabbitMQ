@@ -1,15 +1,15 @@
-using Pandora.RabbitMQ.Bootstrap;
-using Pandora.RabbitMQ.Consumer;
+using One.Settix.RabbitMQ.Bootstrap;
+using One.Settix.RabbitMQ.Consumer;
 
 namespace GG.Consumer;
 
 public class Worker : BackgroundService
 {
-    private readonly PandoraRabbitMqStartup _rabbitMqStartup;
-    private readonly PandoraRabbitMqConsumerFactory _consumerFactory;
+    private readonly SettixRabbitMqStartup _rabbitMqStartup;
+    private readonly SettixRabbitMqConsumerFactory _consumerFactory;
     private readonly ILogger<Worker> _logger;
 
-    public Worker(PandoraRabbitMqStartup rabbitMqStartup, PandoraRabbitMqConsumerFactory consumerFactory, ILogger<Worker> logger)
+    public Worker(SettixRabbitMqStartup rabbitMqStartup, SettixRabbitMqConsumerFactory consumerFactory, ILogger<Worker> logger)
     {
         _rabbitMqStartup = rabbitMqStartup;
         _consumerFactory = consumerFactory;

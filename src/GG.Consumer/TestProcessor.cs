@@ -1,8 +1,8 @@
-﻿using Pandora.RabbitMQ.PandoraConfigurationMessageProcessors;
+﻿using One.Settix.RabbitMQ.SettixConfigurationMessageProcessors;
 
 namespace GG.Consumer
 {
-    public class TestProcessor : IPandoraConfigurationMessageProcessor
+    public class TestProcessor : ISettixConfigurationMessageProcessor
     {
         private readonly ILogger<TestProcessor> logger;
 

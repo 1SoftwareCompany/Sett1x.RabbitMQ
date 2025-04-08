@@ -1,10 +1,10 @@
 using GG.Publisher;
-using Pandora.RabbitMQ;
+using One.Settix.RabbitMQ;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddHostedService<Worker>();
 
-builder.Services.AddPandoraRabbitMqPublisher();
+builder.Services.AddSettixRabbitMqPublisher();
 
 var host = builder.Build();
 host.Run();

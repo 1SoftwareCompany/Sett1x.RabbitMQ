@@ -1,13 +1,13 @@
 using GG.Consumer;
-using Pandora.RabbitMQ;
-using Pandora.RabbitMQ.PandoraConfigurationMessageProcessors;
+using One.Settix.RabbitMQ;
+using One.Settix.RabbitMQ.SettixConfigurationMessageProcessors;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddHostedService<Worker>();
 
 builder.Services.AddLogging();
-builder.Services.AddPandoraRabbitMqConsumer();
-builder.Services.AddSingleton<IPandoraConfigurationMessageProcessor, TestProcessor>();
+builder.Services.AddSettixRabbitMqConsumer();
+builder.Services.AddSingleton<ISettixConfigurationMessageProcessor, TestProcessor>();
 
 var host = builder.Build();
 

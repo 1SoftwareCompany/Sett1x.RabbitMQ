@@ -1,6 +1,6 @@
 ---
 variables:
-  PROJECT_DIR: Pandora.RabbitMQ
+  PROJECT_DIR: One.Settix.RabbitMQ
 
 trigger:
   branches:

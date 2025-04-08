@@ -1,16 +1,16 @@
-using Pandora.RabbitMQ.Bootstrap;
-using Pandora.RabbitMQ.PandoraConfigurationMessageProcessors;
-using Pandora.RabbitMQ.Publisher;
+using One.Settix.RabbitMQ.Bootstrap;
+using One.Settix.RabbitMQ.SettixConfigurationMessageProcessors;
+using One.Settix.RabbitMQ.Publisher;
 
 namespace GG.Publisher
 {
     public class Worker : BackgroundService
     {
-        private readonly PandoraRabbitMqPublisher _publisher;
-        private readonly PandoraRabbitMqStartup _rabbitMqStartup;
+        private readonly SettixRabbitMqPublisher _publisher;
+        private readonly SettixRabbitMqStartup _rabbitMqStartup;
         private readonly ILogger<Worker> _logger;
 
-        public Worker(PandoraRabbitMqPublisher publisher, PandoraRabbitMqStartup rabbitMqStartup, ILogger<Worker> logger)
+        public Worker(SettixRabbitMqPublisher publisher, SettixRabbitMqStartup rabbitMqStartup, ILogger<Worker> logger)
         {
             _publisher = publisher;
             _rabbitMqStartup = rabbitMqStartup;
