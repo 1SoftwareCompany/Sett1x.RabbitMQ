@@ -71,66 +71,42 @@ public sealed class AsyncConsumer : AsyncEventingBasicConsumer
 
     private async Task ProcessAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
     {
-        bool isRequest = false;
-
         if (ev.BasicProperties.IsHeadersPresent() && ev.BasicProperties.Headers.TryGetValue(MessageType, out object messageType))
         {
-            isRequest = IsRequestMessage(messageType);
+            string contract = GetMessageContract(messageType);
+
+            try
+            {
+                switch (contract)
+                {
+                    case ConfigurationRequest.ContractId: // TODO: use the contract id
+                        await ProcessConfigurationRequestAsync(ev, consumer).ConfigureAwait(false);
+                        break;
+                    case ConfigurationResponse.ContractId:
+                        await ProcessConfigurationResponseAsync(ev, consumer).ConfigureAwait(false);
+                        break;
+                    case RemoveConfigurationRequest.ContractId:
+                        await ProcessRemoveConfigurationRequestAsync(ev, consumer).ConfigureAwait(false);
+                        break;
+                    case RemoveConfigurationResponse.ContractId:
+                        await ProcessRemoveConfigurationResponseAsync(ev, consumer).ConfigureAwait(false);
+                        break;
+                    default:
+                        _logger.LogError("Mising MessageType {MessageType}, can't desialize message {message}", MessageType, Convert.ToBase64String(ev.Body.ToArray()));
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Failed to process message. Failed to deserialize : {Convert.ToBase64String(ev.Body.ToArray())}");
+            }
         }
         else
         {
-            _logger.LogError("Miising MessageType {MessageType}, can't desialize message {message}", MessageType, Convert.ToBase64String(ev.Body.ToArray()));
-            Ack(ev, consumer);
-            return;
+            _logger.LogError("Missing MessageType {MessageType}, can't deserialize message {message}", MessageType, Convert.ToBase64String(ev.Body.ToArray()));
         }
 
-        ConfigurationRequest request = default; // this is not ideal
-        ConfigurationResponse response = default; // this is not ideal
-        try
-        {
-            if (isRequest)
-            {
-                request = JsonSerializer.Deserialize<ConfigurationRequest>(ev.Body.ToArray());
-            }
-            else
-            {
-                response = JsonSerializer.Deserialize<ConfigurationResponse>(ev.Body.ToArray());
-            }
-        }
-        catch (Exception ex)
-        {
-            // TODO: send to dead letter exchange/queue
-            _logger.LogError(ex, $"Failed to process message. Failed to deserialize : {Convert.ToBase64String(ev.Body.ToArray())}");
-            Ack(ev, consumer);
-            return;
-        }
-
-        try
-        {
-            if (isRequest)
-            {
-                await _settixConfigurationMessageProcessor.ProcessAsync(request).ConfigureAwait(false);
-                _logger.LogDebug("Received request message: {@message}", request);
-            }
-            else
-            {
-                await _settixConfigurationMessageProcessor.ProcessAsync(response).ConfigureAwait(false);
-                _logger.LogDebug("Received response message: {@message}", response);
-            }
-
-        }
-        catch (Exception ex)
-        {
-            if (isRequest)
-                _logger.LogError(ex, "Failed to process request message. {message}", JsonSerializer.Serialize(request));
-            else
-                _logger.LogError(ex, "Failed to process response message. {message}", JsonSerializer.Serialize(response));
-        }
-        finally
-        {
-            // Acknowledge the message
-            Ack(ev, consumer);
-        }
+        Ack(ev, consumer);
 
         static void Ack(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
         {
@@ -141,13 +117,33 @@ public sealed class AsyncConsumer : AsyncEventingBasicConsumer
         }
     }
 
-    private static bool IsRequestMessage(object messageHeader)
+    private static string GetMessageContract(object messageHeader)
     {
-        if (messageHeader is byte[] byteArray)
-        {
-            ReadOnlySpan<byte> byteArrAsSpan = byteArray.AsSpan();
-            return byteArrAsSpan.IndexOf(Encoding.UTF8.GetBytes(ConfigurationRequest.ContractId).AsSpan()) > -1;
-        }
-        return false;
+        byte[] headerBytes = messageHeader as byte[];
+        return Encoding.UTF8.GetString(headerBytes);
+    }
+
+    private async Task ProcessConfigurationRequestAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
+    {
+        ConfigurationRequest request = JsonSerializer.Deserialize<ConfigurationRequest>(ev.Body.ToArray());
+        await _settixConfigurationMessageProcessor.ProcessAsync(request).ConfigureAwait(false);
+    }
+
+    private async Task ProcessConfigurationResponseAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
+    {
+        ConfigurationResponse response = JsonSerializer.Deserialize<ConfigurationResponse>(ev.Body.ToArray());
+        await _settixConfigurationMessageProcessor.ProcessAsync(response).ConfigureAwait(false);
+    }
+
+    private async Task ProcessRemoveConfigurationRequestAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
+    {
+        RemoveConfigurationRequest request = JsonSerializer.Deserialize<RemoveConfigurationRequest>(ev.Body.ToArray());
+        await _settixConfigurationMessageProcessor.ProcessAsync(request).ConfigureAwait(false);
+    }
+
+    private async Task ProcessRemoveConfigurationResponseAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
+    {
+        RemoveConfigurationResponse response = JsonSerializer.Deserialize<RemoveConfigurationResponse>(ev.Body.ToArray());
+        await _settixConfigurationMessageProcessor.ProcessAsync(response).ConfigureAwait(false);
     }
 }

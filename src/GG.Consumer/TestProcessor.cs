@@ -21,5 +21,10 @@ namespace GG.Consumer
         {
             throw new NotImplementedException();
         }
+
+        public Task ProcessAsync(RemoveConfigurationRequest message)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

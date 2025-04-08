@@ -20,12 +20,12 @@ namespace GG.Publisher
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             _rabbitMqStartup.Start("giService");
-            _rabbitMqStartup.Start("topService");
 
             Dictionary<string, string> keyValuePairs = new Dictionary<string, string>();
             keyValuePairs.Add("key1", "value1");
-            _publisher.Publish(new ConfigurationRequest("tenant", "giService", keyValuePairs, DateTimeOffset.UtcNow));
-            _publisher.Publish(new ConfigurationRequest("tenant", "topService", keyValuePairs, DateTimeOffset.UtcNow));
+            //_publisher.Publish(new ConfigurationRequest("tenant", "giService", keyValuePairs, DateTimeOffset.UtcNow));
+
+            _publisher.Publish(new RemoveConfigurationRequest("tenant", "giService", keyValuePairs, true, DateTimeOffset.UtcNow));
 
             while (!stoppingToken.IsCancellationRequested)
             {

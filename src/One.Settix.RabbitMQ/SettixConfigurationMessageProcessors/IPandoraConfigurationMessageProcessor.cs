@@ -4,4 +4,6 @@ public interface ISettixConfigurationMessageProcessor // TODO: this needs to be 
 {
     Task ProcessAsync(ConfigurationRequest message);
     Task ProcessAsync(ConfigurationResponse message);
+    Task ProcessAsync(RemoveConfigurationRequest message) => Task.CompletedTask;
+    Task ProcessAsync(RemoveConfigurationResponse message) => Task.CompletedTask;
 }
