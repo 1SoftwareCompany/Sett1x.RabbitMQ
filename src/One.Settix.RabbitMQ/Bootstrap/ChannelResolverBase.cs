@@ -5,51 +5,59 @@ namespace One.Settix.RabbitMQ.Bootstrap;
 
 public abstract class ChannelResolverBase
 {
-    protected readonly Dictionary<string, IModel> channels;
-    protected readonly ConnectionResolver connectionResolver;
-    protected static readonly object @lock = new object();
+    protected readonly Dictionary<string, IChannel> channels;
+    protected readonly AsyncConnectionResolver connectionResolver;
+    protected static SemaphoreSlim @lock = new SemaphoreSlim(1);
 
-    public ChannelResolverBase(ConnectionResolver connectionResolver)
+    public ChannelResolverBase(AsyncConnectionResolver connectionResolver)
     {
-        channels = new Dictionary<string, IModel>();
+        channels = new Dictionary<string, IChannel>();
         this.connectionResolver = connectionResolver;
     }
 
-    public virtual IModel Resolve(string resolveKey, RabbitMqOptions options, string boundedContext)
+    public virtual async ValueTask<IChannel> ResolveAsync(string resolveKey, RabbitMqOptions options, string boundedContext)
     {
         resolveKey = resolveKey.ToLower();
 
-        IModel channel = GetExistingChannel(resolveKey);
+        IChannel channel = GetExistingChannel(resolveKey);
 
         if (channel is null || channel.IsClosed)
         {
-            lock (@lock) // Maybe we should make this lock per key?!?
+            try
             {
-                channel = GetExistingChannel(resolveKey);
+                await @lock.WaitAsync(1000).ConfigureAwait(false);
 
-                if (channel?.IsClosed == true)
                 {
-                    channels.Remove(resolveKey);
-                    channel = null;
-                }
+                    channel = GetExistingChannel(resolveKey);
 
-                if (channel is null)
-                {
-                    var connection = connectionResolver.Resolve(boundedContext, options);
-                    IModel scopedChannel = connection.CreateModel();
-                    scopedChannel.ConfirmSelect();
+                    if (channel?.IsClosed == true)
+                    {
+                        channels.Remove(resolveKey);
+                        channel = null;
+                    }
 
-                    channels.Add(resolveKey, scopedChannel);
+                    if (channel is null)
+                    {
+                        var connection = await connectionResolver.ResolveAsync(boundedContext, options).ConfigureAwait(false);
+                        CreateChannelOptions channelOpts = new CreateChannelOptions(publisherConfirmationsEnabled: true, publisherConfirmationTrackingEnabled: false);
+                        IChannel scopedChannel = await connection.CreateChannelAsync(channelOpts).ConfigureAwait(false);
+
+                        channels.Add(resolveKey, scopedChannel);
+                    }
                 }
+            }
+            finally
+            {
+                @lock?.Release();
             }
         }
 
         return GetExistingChannel(resolveKey);
     }
 
-    protected IModel GetExistingChannel(string resolveKey)
+    protected IChannel GetExistingChannel(string resolveKey)
     {
-        channels.TryGetValue(resolveKey, out IModel channel);
+        channels.TryGetValue(resolveKey, out IChannel channel);
 
         return channel;
     }

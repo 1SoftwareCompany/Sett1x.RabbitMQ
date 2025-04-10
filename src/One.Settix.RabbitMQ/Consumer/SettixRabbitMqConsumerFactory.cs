@@ -23,15 +23,16 @@ public sealed class SettixRabbitMqConsumerFactory
         _logger = logger;
     }
 
-    public void CreateAndStartConsumer(string serviceKey, CancellationToken cancellationToken)
+    public async Task CreateAndStartConsumerAsync(string serviceKey, CancellationToken cancellationToken)
     {
         try
         {
             string consumerChannelKey = SettixRabbitMqNamer.GetConsumerChannelName(serviceKey);
-            IModel channel = _channelResolver.Resolve(consumerChannelKey, options, options.VHost);
+            IChannel channel = await _channelResolver.ResolveAsync(consumerChannelKey, options, options.VHost).ConfigureAwait(false);
             string queueName = SettixRabbitMqNamer.GetQueueName(serviceKey);
 
-            _consumer = new AsyncConsumer(queueName, _settixConfigurationMessageProcessor, channel, _logger);
+            _consumer = new AsyncConsumer(_settixConfigurationMessageProcessor, channel, _logger);
+            await _consumer.ConfigureConsumerAsync(queueName).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -44,6 +45,6 @@ public sealed class SettixRabbitMqConsumerFactory
         if (_consumer is null)
             return;
 
-        await _consumer.StopAsync();
+        await _consumer.StopAsync().ConfigureAwait(false);
     }
 }

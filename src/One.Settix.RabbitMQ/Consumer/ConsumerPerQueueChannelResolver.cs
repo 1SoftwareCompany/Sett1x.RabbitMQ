@@ -5,5 +5,5 @@ namespace One.Settix.RabbitMQ.Consumer;
 
 public class ConsumerPerQueueChannelResolver : ChannelResolverBase // channels per queue
 {
-    public ConsumerPerQueueChannelResolver(ConnectionResolver connectionResolver) : base(connectionResolver) { }
+    public ConsumerPerQueueChannelResolver(AsyncConnectionResolver connectionResolver) : base(connectionResolver) { }
 }

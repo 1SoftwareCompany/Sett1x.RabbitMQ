@@ -4,31 +4,37 @@ using System.Collections.Concurrent;
 
 namespace One.Settix.RabbitMQ.Publisher;
 
-public class ConnectionResolver : IDisposable
+public class AsyncConnectionResolver : IAsyncDisposable
 {
     private readonly ConcurrentDictionary<string, IConnection> connectionsPerVHost;
     private readonly IRabbitMqConnectionFactory connectionFactory;
-    private static readonly object connectionLock = new object(); // TODO: Use lock object after update to .NET 9
+    private static SemaphoreSlim @lock = new SemaphoreSlim(1);
 
-    public ConnectionResolver(IRabbitMqConnectionFactory connectionFactory)
+    public AsyncConnectionResolver(IRabbitMqConnectionFactory connectionFactory)
     {
         connectionsPerVHost = new ConcurrentDictionary<string, IConnection>();
         this.connectionFactory = connectionFactory;
     }
 
-    public IConnection Resolve(string key, RabbitMqOptions options)
+    public async Task<IConnection> ResolveAsync(string key, RabbitMqOptions options)
     {
         IConnection connection = GetExistingConnection(key);
 
         if (connection is null || connection.IsOpen == false)
         {
-            lock (connectionLock)
+            await @lock.WaitAsync(1000).ConfigureAwait(false);
+
+            try
             {
                 connection = GetExistingConnection(key);
                 if (connection is null || connection.IsOpen == false)
                 {
-                    connection = CreateConnection(key, options);
+                    connection = await CreateConnectionAsync(key, options).ConfigureAwait(false);
                 }
+            }
+            finally
+            {
+                @lock?.Release();
             }
         }
 
@@ -42,9 +48,9 @@ public class ConnectionResolver : IDisposable
         return connection;
     }
 
-    private IConnection CreateConnection(string key, RabbitMqOptions options)
+    private async Task<IConnection> CreateConnectionAsync(string key, RabbitMqOptions options)
     {
-        IConnection connection = connectionFactory.CreateConnectionWithOptions(options);
+        IConnection connection = await connectionFactory.CreateConnectionWithOptionsAsync(options).ConfigureAwait(false);
 
         if (connectionsPerVHost.TryGetValue(key, out _))
         {
@@ -59,11 +65,11 @@ public class ConnectionResolver : IDisposable
         return connection;
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         foreach (var connection in connectionsPerVHost)
         {
-            connection.Value.Close(TimeSpan.FromSeconds(5));
+            await connection.Value.CloseAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
         }
     }
 }

@@ -6,18 +6,22 @@ namespace One.Settix.RabbitMQ.Publisher;
 
 public class PublisherChannelResolver : ChannelResolverBase // channels per exchange
 {
-    public PublisherChannelResolver(ConnectionResolver connectionResolver) : base(connectionResolver) { }
+    private static SemaphoreSlim asyncLock = new SemaphoreSlim(1);
 
-    public override IModel Resolve(string exchange, RabbitMqOptions options, string serviceKey)
+    public PublisherChannelResolver(AsyncConnectionResolver connectionResolver) : base(connectionResolver) { }
+
+    public override async ValueTask<IChannel> ResolveAsync(string exchange, RabbitMqOptions options, string serviceKey)
     {
         string channelKey = $"{serviceKey}_{exchange}_{options.Server}".ToLower();
         string connectionKey = $"{options.VHost}_{options.Server}".ToLower();
 
-        IModel channel = GetExistingChannel(channelKey);
+        IChannel channel = GetExistingChannel(channelKey);
 
         if (channel is null || channel.IsClosed)
         {
-            lock (@lock)
+            await asyncLock.WaitAsync(1000).ConfigureAwait(false);
+
+            try
             {
                 channel = GetExistingChannel(channelKey);
 
@@ -29,34 +33,38 @@ public class PublisherChannelResolver : ChannelResolverBase // channels per exch
 
                 if (channel is null)
                 {
-                    var connection = connectionResolver.Resolve(connectionKey, options);
-                    IModel scopedChannel = CreateModelForPublisher(connection);
+                    IConnection connection = await connectionResolver.ResolveAsync(connectionKey, options).ConfigureAwait(false);
+                    IChannel scopedChannel = await CreateModelForPublisherAsync(connection).ConfigureAwait(false);
                     try
                     {
                         if (string.IsNullOrEmpty(exchange) == false)
                         {
-                            scopedChannel.ExchangeDeclarePassive(exchange);
+                            await scopedChannel.ExchangeDeclarePassiveAsync(exchange).ConfigureAwait(false);
                         }
                     }
                     catch (OperationInterruptedException)
                     {
                         scopedChannel.Dispose();
-                        scopedChannel = CreateModelForPublisher(connection);
-                        scopedChannel.ExchangeDeclare(exchange, ExchangeType.Direct, true);
+                        scopedChannel = await CreateModelForPublisherAsync(connection).ConfigureAwait(false);
+                        await scopedChannel.ExchangeDeclareAsync(exchange, ExchangeType.Direct, true).ConfigureAwait(false);
                     }
 
                     channels.Add(channelKey, scopedChannel);
                 }
+            }
+            finally
+            {
+                asyncLock?.Release();
             }
         }
 
         return GetExistingChannel(channelKey);
     }
 
-    private IModel CreateModelForPublisher(IConnection connection)
+    private async Task<IChannel> CreateModelForPublisherAsync(IConnection connection)
     {
-        IModel channel = connection.CreateModel();
-        channel.ConfirmSelect();
+        CreateChannelOptions channelOpts = new CreateChannelOptions(publisherConfirmationsEnabled: true, publisherConfirmationTrackingEnabled: false);
+        IChannel channel = await connection.CreateChannelAsync(channelOpts).ConfigureAwait(false);
 
         return channel;
     }

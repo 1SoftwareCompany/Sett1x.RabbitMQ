@@ -19,7 +19,7 @@ public sealed class SettixRabbitMqStartup
         _logger = logger;
     }
 
-    public void Start(string queuePrefix)
+    public async Task StartAsync(string queuePrefix)
     {
         try
         {
@@ -28,9 +28,9 @@ public sealed class SettixRabbitMqStartup
                 RabbitMqManagementClient rmqClient = new RabbitMqManagementClient(clusterOption);
                 CreateVHost(rmqClient, clusterOption);
 
-                using var connection = _connectionFactory.CreateConnectionWithOptions(clusterOption);
-                using var channel = connection.CreateModel();
-                RecoverModel(channel, queuePrefix);
+                using var connection = await _connectionFactory.CreateConnectionWithOptionsAsync(clusterOption).ConfigureAwait(false);
+                using var channel = await connection.CreateChannelAsync().ConfigureAwait(false);
+                await RecoverModelAsync(channel, queuePrefix).ConfigureAwait(false);
             }
 
         }
@@ -40,15 +40,15 @@ public sealed class SettixRabbitMqStartup
         }
     }
 
-    private void RecoverModel(IModel model, string queuePrefix)
+    private async Task RecoverModelAsync(IChannel model, string queuePrefix)
     {
         string exchangeName = SettixRabbitMqNamer.GetExchangeName();
         string queueName = SettixRabbitMqNamer.GetQueueName(queuePrefix);
         string routingKey = SettixRabbitMqNamer.GetRoutingKey(queuePrefix);
 
-        model.ExchangeDeclare(exchangeName, ExchangeType.Direct, true);
-        model.QueueDeclare(queueName, true, false, false, null);
-        model.QueueBind(queueName, exchangeName, routingKey);
+        await model.ExchangeDeclareAsync(exchangeName, ExchangeType.Direct, true).ConfigureAwait(false);
+        await model.QueueDeclareAsync(queueName, true, false, false, null).ConfigureAwait(false);
+        await model.QueueBindAsync(queueName, exchangeName, routingKey).ConfigureAwait(false);
     }
 
     private void CreateVHost(RabbitMqManagementClient client, RabbitMqOptions options)
