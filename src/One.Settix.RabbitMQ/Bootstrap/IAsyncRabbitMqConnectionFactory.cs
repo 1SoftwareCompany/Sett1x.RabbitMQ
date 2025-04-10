@@ -2,7 +2,7 @@
 
 namespace One.Settix.RabbitMQ.Bootstrap;
 
-public interface IRabbitMqConnectionFactory
+public interface IAsyncRabbitMqConnectionFactory
 {
     Task<IConnection> CreateConnectionWithOptionsAsync(RabbitMqOptions options);
 }

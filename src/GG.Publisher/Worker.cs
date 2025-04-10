@@ -6,11 +6,11 @@ namespace GG.Publisher
 {
     public class Worker : BackgroundService
     {
-        private readonly SettixRabbitMqPublisher _publisher;
+        private readonly AsyncSettixRabbitMqPublisher _publisher;
         private readonly SettixRabbitMqStartup _rabbitMqStartup;
         private readonly ILogger<Worker> _logger;
 
-        public Worker(SettixRabbitMqPublisher publisher, SettixRabbitMqStartup rabbitMqStartup, ILogger<Worker> logger)
+        public Worker(AsyncSettixRabbitMqPublisher publisher, SettixRabbitMqStartup rabbitMqStartup, ILogger<Worker> logger)
         {
             _publisher = publisher;
             _rabbitMqStartup = rabbitMqStartup;

@@ -4,11 +4,11 @@ using RabbitMQ.Client.Exceptions;
 
 namespace One.Settix.RabbitMQ.Publisher;
 
-public class PublisherChannelResolver : ChannelResolverBase // channels per exchange
+public class AsyncPublisherChannelResolver : AsyncChannelResolverBase // channels per exchange
 {
     private static SemaphoreSlim asyncLock = new SemaphoreSlim(1);
 
-    public PublisherChannelResolver(AsyncConnectionResolver connectionResolver) : base(connectionResolver) { }
+    public AsyncPublisherChannelResolver(AsyncConnectionResolver connectionResolver) : base(connectionResolver) { }
 
     public override async ValueTask<IChannel> ResolveAsync(string exchange, RabbitMqOptions options, string serviceKey)
     {

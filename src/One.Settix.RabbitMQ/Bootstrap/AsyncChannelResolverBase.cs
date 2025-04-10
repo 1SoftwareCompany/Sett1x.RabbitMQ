@@ -3,13 +3,13 @@ using RabbitMQ.Client;
 
 namespace One.Settix.RabbitMQ.Bootstrap;
 
-public abstract class ChannelResolverBase
+public abstract class AsyncChannelResolverBase
 {
     protected readonly Dictionary<string, IChannel> channels;
     protected readonly AsyncConnectionResolver connectionResolver;
     protected static SemaphoreSlim @lock = new SemaphoreSlim(1);
 
-    public ChannelResolverBase(AsyncConnectionResolver connectionResolver)
+    public AsyncChannelResolverBase(AsyncConnectionResolver connectionResolver)
     {
         channels = new Dictionary<string, IChannel>();
         this.connectionResolver = connectionResolver;

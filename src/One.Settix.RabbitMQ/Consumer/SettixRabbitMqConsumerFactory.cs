@@ -8,14 +8,14 @@ namespace One.Settix.RabbitMQ.Consumer;
 
 public sealed class SettixRabbitMqConsumerFactory
 {
-    private AsyncConsumer _consumer;
+    private AsyncSettixRabbitMqConsumer _consumer;
 
     private readonly ISettixConfigurationMessageProcessor _settixConfigurationMessageProcessor;
     private readonly RabbitMqOptions options;
-    private readonly ConsumerPerQueueChannelResolver _channelResolver;
+    private readonly AsyncConsumerPerQueueChannelResolver _channelResolver;
     private readonly ILogger<SettixRabbitMqConsumerFactory> _logger;
 
-    public SettixRabbitMqConsumerFactory(ISettixConfigurationMessageProcessor settixConfigurationMessageProcessor, IOptionsMonitor<RabbitMqOptions> optionsMonitor, ConsumerPerQueueChannelResolver channelResolver, ILogger<SettixRabbitMqConsumerFactory> logger)
+    public SettixRabbitMqConsumerFactory(ISettixConfigurationMessageProcessor settixConfigurationMessageProcessor, IOptionsMonitor<RabbitMqOptions> optionsMonitor, AsyncConsumerPerQueueChannelResolver channelResolver, ILogger<SettixRabbitMqConsumerFactory> logger)
     {
         _settixConfigurationMessageProcessor = settixConfigurationMessageProcessor;
         options = optionsMonitor.CurrentValue; //TODO: Implement onChange event
@@ -31,7 +31,7 @@ public sealed class SettixRabbitMqConsumerFactory
             IChannel channel = await _channelResolver.ResolveAsync(consumerChannelKey, options, options.VHost).ConfigureAwait(false);
             string queueName = SettixRabbitMqNamer.GetQueueName(serviceKey);
 
-            _consumer = new AsyncConsumer(_settixConfigurationMessageProcessor, channel, _logger);
+            _consumer = new AsyncSettixRabbitMqConsumer(_settixConfigurationMessageProcessor, channel, _logger);
             await _consumer.ConfigureConsumerAsync(queueName).ConfigureAwait(false);
         }
         catch (Exception ex)

@@ -7,13 +7,13 @@ using System.Text.Json;
 
 namespace One.Settix.RabbitMQ.Publisher;
 
-public sealed class SettixRabbitMqPublisher
+public sealed class AsyncSettixRabbitMqPublisher
 {
     private readonly RabbitMqClusterOptions options;
-    private readonly PublisherChannelResolver _channelResolver;
-    private readonly ILogger<SettixRabbitMqPublisher> _logger;
+    private readonly AsyncPublisherChannelResolver _channelResolver;
+    private readonly ILogger<AsyncSettixRabbitMqPublisher> _logger;
 
-    public SettixRabbitMqPublisher(IOptionsMonitor<RabbitMqClusterOptions> optionsMonitor, PublisherChannelResolver channelResolver, ILogger<SettixRabbitMqPublisher> logger)
+    public AsyncSettixRabbitMqPublisher(IOptionsMonitor<RabbitMqClusterOptions> optionsMonitor, AsyncPublisherChannelResolver channelResolver, ILogger<AsyncSettixRabbitMqPublisher> logger)
     {
         options = optionsMonitor.CurrentValue; // TODO: Implement onChange event
         _channelResolver = channelResolver;

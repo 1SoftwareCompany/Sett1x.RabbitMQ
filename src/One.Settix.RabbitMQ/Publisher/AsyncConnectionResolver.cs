@@ -7,10 +7,10 @@ namespace One.Settix.RabbitMQ.Publisher;
 public class AsyncConnectionResolver : IAsyncDisposable
 {
     private readonly ConcurrentDictionary<string, IConnection> connectionsPerVHost;
-    private readonly IRabbitMqConnectionFactory connectionFactory;
+    private readonly IAsyncRabbitMqConnectionFactory connectionFactory;
     private static SemaphoreSlim @lock = new SemaphoreSlim(1);
 
-    public AsyncConnectionResolver(IRabbitMqConnectionFactory connectionFactory)
+    public AsyncConnectionResolver(IAsyncRabbitMqConnectionFactory connectionFactory)
     {
         connectionsPerVHost = new ConcurrentDictionary<string, IConnection>();
         this.connectionFactory = connectionFactory;

@@ -7,7 +7,7 @@ using System.Text.Json;
 
 namespace One.Settix.RabbitMQ.Consumer;
 
-public sealed class AsyncConsumer : AsyncEventingBasicConsumer
+public sealed class AsyncSettixRabbitMqConsumer : AsyncEventingBasicConsumer
 {
     private bool isСurrentlyConsuming;
 
@@ -17,7 +17,7 @@ public sealed class AsyncConsumer : AsyncEventingBasicConsumer
 
     private const string MessageType = "settix-message-type";
 
-    public AsyncConsumer(ISettixConfigurationMessageProcessor settixConfigurationMessageProcessor, IChannel channel, ILogger logger) : base(channel)
+    public AsyncSettixRabbitMqConsumer(ISettixConfigurationMessageProcessor settixConfigurationMessageProcessor, IChannel channel, ILogger logger) : base(channel)
     {
         _settixConfigurationMessageProcessor = settixConfigurationMessageProcessor;
         _channel = channel;

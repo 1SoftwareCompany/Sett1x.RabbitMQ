@@ -9,10 +9,10 @@ namespace One.Settix.RabbitMQ.Bootstrap;
 public sealed class SettixRabbitMqStartup
 {
     private readonly RabbitMqClusterOptions _options;
-    private readonly IRabbitMqConnectionFactory _connectionFactory;
+    private readonly IAsyncRabbitMqConnectionFactory _connectionFactory;
     private readonly ILogger<SettixRabbitMqStartup> _logger;
 
-    public SettixRabbitMqStartup(IOptionsMonitor<RabbitMqClusterOptions> optionsMonitor, IRabbitMqConnectionFactory connectionFactory, ILogger<SettixRabbitMqStartup> logger)
+    public SettixRabbitMqStartup(IOptionsMonitor<RabbitMqClusterOptions> optionsMonitor, IAsyncRabbitMqConnectionFactory connectionFactory, ILogger<SettixRabbitMqStartup> logger)
     {
         _options = optionsMonitor.CurrentValue;
         _connectionFactory = connectionFactory;
