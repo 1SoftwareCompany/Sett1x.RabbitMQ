@@ -9,7 +9,7 @@ public class AsyncConnectionResolver : IAsyncDisposable
     private readonly ConcurrentDictionary<string, IConnection> connectionsPerVHost;
     private readonly IAsyncRabbitMqConnectionFactory connectionFactory;
 
-    private static SemaphoreSlim connectionResolverLock = new SemaphoreSlim(1, 1); // It's crucial to set values for initial and max count of allowed threads, otherwise it is possible to allow more that expected threads to enter the lock.
+    private static SemaphoreSlim connectionResolverLock = new SemaphoreSlim(1, 1); // It's crucial to set values for initial and max count of allowed threads, otherwise it is possible to allow more than expected threads to enter the lock.
 
     public AsyncConnectionResolver(IAsyncRabbitMqConnectionFactory connectionFactory)
     {

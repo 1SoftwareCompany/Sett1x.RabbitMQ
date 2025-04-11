@@ -8,7 +8,7 @@ public abstract class AsyncChannelResolverBase
     protected readonly Dictionary<string, IChannel> channels;
     protected readonly AsyncConnectionResolver connectionResolver;
 
-    protected static SemaphoreSlim channelResolverLock = new SemaphoreSlim(1, 1); // It's crucial to set values for initial and max count of allowed threads, otherwise it is possible to allow more that expected threads to enter the lock.
+    protected static SemaphoreSlim channelResolverLock = new SemaphoreSlim(1, 1); // It's crucial to set values for initial and max count of allowed threads, otherwise it is possible to allow more than expected threads to enter the lock.
 
     public AsyncChannelResolverBase(AsyncConnectionResolver connectionResolver)
     {
