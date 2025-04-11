@@ -28,7 +28,6 @@ public sealed class AsyncRabbitMqConnectionFactory : IAsyncRabbitMqConnectionFac
                 connectionFactory.UserName = options.Username;
                 connectionFactory.Password = options.Password;
                 connectionFactory.VirtualHost = options.VHost;
-                //connectionFactory.DispatchConsumersAsync = true; // TODO: Check me
                 connectionFactory.AutomaticRecoveryEnabled = true;
                 connectionFactory.Ssl.Enabled = options.UseSsl;
                 connectionFactory.EndpointResolverFactory = (_) => MultipleEndpointResolver.ComposeEndpointResolver(options);
