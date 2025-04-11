@@ -30,7 +30,7 @@ public sealed class SettixRabbitMqStartup
 
                 using var connection = await _connectionFactory.CreateConnectionWithOptionsAsync(clusterOption).ConfigureAwait(false);
                 using var channel = await connection.CreateChannelAsync().ConfigureAwait(false);
-                await RecoverModelAsync(channel, queuePrefix).ConfigureAwait(false);
+                await RecoverChannelAsync(channel, queuePrefix).ConfigureAwait(false);
             }
 
         }
@@ -40,15 +40,15 @@ public sealed class SettixRabbitMqStartup
         }
     }
 
-    private async Task RecoverModelAsync(IChannel model, string queuePrefix)
+    private async Task RecoverChannelAsync(IChannel channel, string queuePrefix)
     {
         string exchangeName = SettixRabbitMqNamer.GetExchangeName();
         string queueName = SettixRabbitMqNamer.GetQueueName(queuePrefix);
         string routingKey = SettixRabbitMqNamer.GetRoutingKey(queuePrefix);
 
-        await model.ExchangeDeclareAsync(exchangeName, ExchangeType.Direct, true).ConfigureAwait(false);
-        await model.QueueDeclareAsync(queueName, true, false, false, null).ConfigureAwait(false);
-        await model.QueueBindAsync(queueName, exchangeName, routingKey).ConfigureAwait(false);
+        await channel.ExchangeDeclareAsync(exchangeName, ExchangeType.Direct, true).ConfigureAwait(false);
+        await channel.QueueDeclareAsync(queueName, true, false, false, null).ConfigureAwait(false);
+        await channel.QueueBindAsync(queueName, exchangeName, routingKey).ConfigureAwait(false);
     }
 
     private void CreateVHost(RabbitMqManagementClient client, RabbitMqOptions options)

@@ -9,7 +9,7 @@ namespace One.Settix.RabbitMQ.Consumer;
 
 public sealed class AsyncSettixRabbitMqConsumer : AsyncEventingBasicConsumer
 {
-    private bool isСurrentlyConsuming;
+    private bool isCurrentlyConsuming;
 
     private readonly ISettixConfigurationMessageProcessor _settixConfigurationMessageProcessor;
     private readonly IChannel _channel;
@@ -22,7 +22,7 @@ public sealed class AsyncSettixRabbitMqConsumer : AsyncEventingBasicConsumer
         _settixConfigurationMessageProcessor = settixConfigurationMessageProcessor;
         _channel = channel;
         _logger = logger;
-        isСurrentlyConsuming = false;
+        isCurrentlyConsuming = false;
         ReceivedAsync += AsyncListener_Received;
     }
 
@@ -41,7 +41,7 @@ public sealed class AsyncSettixRabbitMqConsumer : AsyncEventingBasicConsumer
         ReceivedAsync -= AsyncListener_Received;
 
         // 2. Wait to handle any messages in progress
-        while (isСurrentlyConsuming)
+        while (isCurrentlyConsuming)
         {
             // We are trying to wait all consumers to finish their current work.
             // Ofcourse the host could be forcibly shut down but we are doing our best.
@@ -58,7 +58,7 @@ public sealed class AsyncSettixRabbitMqConsumer : AsyncEventingBasicConsumer
         try
         {
             _logger.LogDebug("Message received. Sender {sender}.", sender.GetType().Name);
-            isСurrentlyConsuming = true;
+            isCurrentlyConsuming = true;
 
             if (sender is AsyncEventingBasicConsumer consumer)
                 await ProcessAsync(@event, consumer).ConfigureAwait(false);
@@ -70,7 +70,7 @@ public sealed class AsyncSettixRabbitMqConsumer : AsyncEventingBasicConsumer
         }
         finally
         {
-            isСurrentlyConsuming = false;
+            isCurrentlyConsuming = false;
         }
     }
 

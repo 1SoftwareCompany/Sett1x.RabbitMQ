@@ -36,7 +36,7 @@ public sealed class SettixRabbitMqConsumerFactory
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to start Sett1x.RabbitMQ consumer");
+            _logger.LogError(ex, "Failed to start Sett1x.RabbitMQ consumer.");
         }
     }
 

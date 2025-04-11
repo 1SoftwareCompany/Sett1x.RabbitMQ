@@ -7,7 +7,8 @@ public abstract class AsyncChannelResolverBase
 {
     protected readonly Dictionary<string, IChannel> channels;
     protected readonly AsyncConnectionResolver connectionResolver;
-    protected static SemaphoreSlim @lock = new SemaphoreSlim(1);
+
+    protected static SemaphoreSlim channelResolverLock = new SemaphoreSlim(1, 1); // It's crucial to set values for initial and max count of allowed threads, otherwise it is possible to allow more that expected threads to enter the lock.
 
     public AsyncChannelResolverBase(AsyncConnectionResolver connectionResolver)
     {
@@ -23,32 +24,36 @@ public abstract class AsyncChannelResolverBase
 
         if (channel is null || channel.IsClosed)
         {
+            bool lockTaken = false;
             try
             {
-                await @lock.WaitAsync(1000).ConfigureAwait(false);
-
+                lockTaken = await channelResolverLock.WaitAsync(10_000).ConfigureAwait(false);
+                if (lockTaken == false)
                 {
-                    channel = GetExistingChannel(resolveKey);
+                    throw new TimeoutException("Unable to acquire lock for channel resolver.");
+                }
 
-                    if (channel?.IsClosed == true)
-                    {
-                        channels.Remove(resolveKey);
-                        channel = null;
-                    }
+                channel = GetExistingChannel(resolveKey);
 
-                    if (channel is null)
-                    {
-                        var connection = await connectionResolver.ResolveAsync(boundedContext, options).ConfigureAwait(false);
-                        CreateChannelOptions channelOpts = new CreateChannelOptions(publisherConfirmationsEnabled: true, publisherConfirmationTrackingEnabled: false);
-                        IChannel scopedChannel = await connection.CreateChannelAsync(channelOpts).ConfigureAwait(false);
+                if (channel?.IsClosed == true)
+                {
+                    channels.Remove(resolveKey);
+                    channel = null;
+                }
 
-                        channels.Add(resolveKey, scopedChannel);
-                    }
+                if (channel is null)
+                {
+                    var connection = await connectionResolver.ResolveAsync(boundedContext, options).ConfigureAwait(false);
+                    CreateChannelOptions channelOpts = new CreateChannelOptions(publisherConfirmationsEnabled: true, publisherConfirmationTrackingEnabled: false);
+                    IChannel scopedChannel = await connection.CreateChannelAsync(channelOpts).ConfigureAwait(false);
+
+                    channels.Add(resolveKey, scopedChannel);
                 }
             }
             finally
             {
-                @lock?.Release();
+                if (lockTaken) // only release if we acquired the lock, otherwise it will throw an exception if we exceed the max count of allowed threads
+                    channelResolverLock?.Release();
             }
         }
 

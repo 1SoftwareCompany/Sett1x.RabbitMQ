@@ -8,7 +8,8 @@ public class AsyncConnectionResolver : IAsyncDisposable
 {
     private readonly ConcurrentDictionary<string, IConnection> connectionsPerVHost;
     private readonly IAsyncRabbitMqConnectionFactory connectionFactory;
-    private static SemaphoreSlim @lock = new SemaphoreSlim(1);
+
+    private static SemaphoreSlim connectionResolverLock = new SemaphoreSlim(1, 1); // It's crucial to set values for initial and max count of allowed threads, otherwise it is possible to allow more that expected threads to enter the lock.
 
     public AsyncConnectionResolver(IAsyncRabbitMqConnectionFactory connectionFactory)
     {
@@ -22,10 +23,15 @@ public class AsyncConnectionResolver : IAsyncDisposable
 
         if (connection is null || connection.IsOpen == false)
         {
-            await @lock.WaitAsync(1000).ConfigureAwait(false);
-
+            bool lockTaken = false;
             try
             {
+                lockTaken = await connectionResolverLock.WaitAsync(10_000).ConfigureAwait(false);
+                if (lockTaken == false)
+                {
+                    throw new TimeoutException("Unable to acquire lock for connection resolver.");
+                }
+
                 connection = GetExistingConnection(key);
                 if (connection is null || connection.IsOpen == false)
                 {
@@ -34,7 +40,8 @@ public class AsyncConnectionResolver : IAsyncDisposable
             }
             finally
             {
-                @lock?.Release();
+                if (lockTaken) // only release if we acquired the lock, otherwise it will throw an exception if we exceed the max count of allowed threads
+                    connectionResolverLock?.Release();
             }
         }
 

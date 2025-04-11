@@ -6,7 +6,7 @@ namespace One.Settix.RabbitMQ.Publisher;
 
 public class AsyncPublisherChannelResolver : AsyncChannelResolverBase // channels per exchange
 {
-    private static SemaphoreSlim asyncLock = new SemaphoreSlim(1);
+    private static SemaphoreSlim publisherLock = new SemaphoreSlim(1, 1); // It's crucial to set values for initial and max count of allowed threads, otherwise it is possible to allow more that expected threads to enter the lock.
 
     public AsyncPublisherChannelResolver(AsyncConnectionResolver connectionResolver) : base(connectionResolver) { }
 
@@ -19,10 +19,15 @@ public class AsyncPublisherChannelResolver : AsyncChannelResolverBase // channel
 
         if (channel is null || channel.IsClosed)
         {
-            await asyncLock.WaitAsync(1000).ConfigureAwait(false);
-
+            bool lockTaken = false;
             try
             {
+                lockTaken = await publisherLock.WaitAsync(10_000).ConfigureAwait(false);
+                if (lockTaken == false)
+                {
+                    throw new TimeoutException("Unable to acquire lock for publisher channel resolver.");
+                }
+
                 channel = GetExistingChannel(channelKey);
 
                 if (channel?.IsClosed == true)
@@ -34,7 +39,7 @@ public class AsyncPublisherChannelResolver : AsyncChannelResolverBase // channel
                 if (channel is null)
                 {
                     IConnection connection = await connectionResolver.ResolveAsync(connectionKey, options).ConfigureAwait(false);
-                    IChannel scopedChannel = await CreateModelForPublisherAsync(connection).ConfigureAwait(false);
+                    IChannel scopedChannel = await CreateChannelForPublisherAsync(connection).ConfigureAwait(false);
                     try
                     {
                         if (string.IsNullOrEmpty(exchange) == false)
@@ -45,7 +50,7 @@ public class AsyncPublisherChannelResolver : AsyncChannelResolverBase // channel
                     catch (OperationInterruptedException)
                     {
                         scopedChannel.Dispose();
-                        scopedChannel = await CreateModelForPublisherAsync(connection).ConfigureAwait(false);
+                        scopedChannel = await CreateChannelForPublisherAsync(connection).ConfigureAwait(false);
                         await scopedChannel.ExchangeDeclareAsync(exchange, ExchangeType.Direct, true).ConfigureAwait(false);
                     }
 
@@ -54,14 +59,15 @@ public class AsyncPublisherChannelResolver : AsyncChannelResolverBase // channel
             }
             finally
             {
-                asyncLock?.Release();
+                if (lockTaken) // only release if we acquired the lock, otherwise it will throw an exception if we exceed the max count of allowed threads
+                    publisherLock?.Release();
             }
         }
 
         return GetExistingChannel(channelKey);
     }
 
-    private async Task<IChannel> CreateModelForPublisherAsync(IConnection connection)
+    private async Task<IChannel> CreateChannelForPublisherAsync(IConnection connection)
     {
         CreateChannelOptions channelOpts = new CreateChannelOptions(publisherConfirmationsEnabled: true, publisherConfirmationTrackingEnabled: false);
         IChannel channel = await connection.CreateChannelAsync(channelOpts).ConfigureAwait(false);
