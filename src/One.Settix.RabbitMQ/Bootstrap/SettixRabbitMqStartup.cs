@@ -26,7 +26,7 @@ public sealed class SettixRabbitMqStartup
             foreach (RabbitMqOptions clusterOption in _options.Clusters)
             {
                 RabbitMqManagementClient rmqClient = new RabbitMqManagementClient(clusterOption);
-                CreateVHost(rmqClient, clusterOption);
+                await CreateVHost(rmqClient, clusterOption).ConfigureAwait(false);
 
                 using var connection = await _connectionFactory.CreateConnectionWithOptionsAsync(clusterOption).ConfigureAwait(false);
                 using var channel = await connection.CreateChannelAsync().ConfigureAwait(false);
@@ -51,14 +51,16 @@ public sealed class SettixRabbitMqStartup
         await channel.QueueBindAsync(queueName, exchangeName, routingKey).ConfigureAwait(false);
     }
 
-    private void CreateVHost(RabbitMqManagementClient client, RabbitMqOptions options)
+    private async Task CreateVHost(RabbitMqManagementClient client, RabbitMqOptions options)
     {
-        if (client.GetVHosts().Any(vh => vh.Name == options.VHost) == false)
+        IEnumerable<Vhost> vhosts = await client.GetVHostsAsync().ConfigureAwait(false);
+        if (vhosts.Any(vh => vh.Name == options.VHost) == false)
         {
-            var vhost = client.CreateVirtualHost(options.VHost);
-            var rabbitMqUser = client.GetUsers().SingleOrDefault(x => x.Name == options.Username);
+            var vhost = await client.CreateVirtualHostAsync(options.VHost).ConfigureAwait(false);
+            var rmqUsers = await client.GetUsersAsync().ConfigureAwait(false);
+            var rabbitMqUser = rmqUsers.SingleOrDefault(x => x.Name == options.Username);
             var permissionInfo = new PermissionInfo(rabbitMqUser, vhost);
-            client.CreatePermission(permissionInfo);
+            await client.CreatePermissionAsync(permissionInfo);
         }
     }
 }
