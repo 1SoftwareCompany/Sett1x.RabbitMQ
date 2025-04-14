@@ -8,34 +8,38 @@ namespace One.Settix.RabbitMQ.Consumer;
 
 public sealed class SettixRabbitMqConsumerFactory
 {
-    private AsyncConsumer _consumer;
-
+    private SettixConsumer _consumer;
+    private readonly SettixRabbitMqConfiguration settixRabbitMqConfiguration;
     private readonly ISettixConfigurationMessageProcessor _settixConfigurationMessageProcessor;
     private readonly RabbitMqOptions options;
     private readonly ConsumerPerQueueChannelResolver _channelResolver;
     private readonly ILogger<SettixRabbitMqConsumerFactory> _logger;
 
-    public SettixRabbitMqConsumerFactory(ISettixConfigurationMessageProcessor settixConfigurationMessageProcessor, IOptionsMonitor<RabbitMqOptions> optionsMonitor, ConsumerPerQueueChannelResolver channelResolver, ILogger<SettixRabbitMqConsumerFactory> logger)
+    public SettixRabbitMqConsumerFactory(SettixRabbitMqConfiguration settixRabbitMqConfiguration, ISettixConfigurationMessageProcessor settixConfigurationMessageProcessor, IOptionsMonitor<RabbitMqOptions> optionsMonitor, ConsumerPerQueueChannelResolver channelResolver, ILogger<SettixRabbitMqConsumerFactory> logger)
     {
+        this.settixRabbitMqConfiguration = settixRabbitMqConfiguration;
         _settixConfigurationMessageProcessor = settixConfigurationMessageProcessor;
         options = optionsMonitor.CurrentValue; //TODO: Implement onChange event
         _channelResolver = channelResolver;
         _logger = logger;
     }
 
-    public void CreateAndStartConsumer(string serviceKey, CancellationToken cancellationToken)
+    public async Task CreateAndStartConsumerAsync(string serviceKey, CancellationToken cancellationToken)
     {
         try
         {
+            await settixRabbitMqConfiguration.ConfigureAsync(serviceKey);
+
             string consumerChannelKey = SettixRabbitMqNamer.GetConsumerChannelName(serviceKey);
-            IModel channel = _channelResolver.Resolve(consumerChannelKey, options, options.VHost);
+            IChannel channel = await _channelResolver.ResolveAsync(consumerChannelKey, options, options.VHost, cancellationToken).ConfigureAwait(false);
             string queueName = SettixRabbitMqNamer.GetQueueName(serviceKey);
 
-            _consumer = new AsyncConsumer(queueName, _settixConfigurationMessageProcessor, channel, _logger);
+            _consumer = new SettixConsumer(_settixConfigurationMessageProcessor, channel, _logger);
+            await _consumer.ConfigureConsumerAsync(queueName).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to start Sett1x.RabbitMQ consumer");
+            _logger.LogError(ex, "Failed to start Sett1x.RabbitMQ consumer.");
         }
     }
 
@@ -44,6 +48,6 @@ public sealed class SettixRabbitMqConsumerFactory
         if (_consumer is null)
             return;
 
-        await _consumer.StopAsync();
+        await _consumer.StopAsync().ConfigureAwait(false);
     }
 }

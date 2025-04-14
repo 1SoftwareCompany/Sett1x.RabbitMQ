@@ -4,21 +4,30 @@ using RabbitMQ.Client.Exceptions;
 
 namespace One.Settix.RabbitMQ.Publisher;
 
-public class PublisherChannelResolver : ChannelResolverBase // channels per exchange
+public sealed class PublisherChannelResolver : ChannelResolverBase // channels per exchange
 {
+    private static SemaphoreSlim publisherLock = new SemaphoreSlim(1, 1); // It's crucial to set values for initial and max count of allowed threads, otherwise it is possible to allow more than expected threads to enter the lock.
+
     public PublisherChannelResolver(ConnectionResolver connectionResolver) : base(connectionResolver) { }
 
-    public override IModel Resolve(string exchange, RabbitMqOptions options, string serviceKey)
+    public override async ValueTask<IChannel> ResolveAsync(string exchange, RabbitMqOptions options, string serviceKey, CancellationToken cancellationToken = default)
     {
         string channelKey = $"{serviceKey}_{exchange}_{options.Server}".ToLower();
         string connectionKey = $"{options.VHost}_{options.Server}".ToLower();
 
-        IModel channel = GetExistingChannel(channelKey);
+        IChannel channel = GetExistingChannel(channelKey);
 
         if (channel is null || channel.IsClosed)
         {
-            lock (@lock)
+            bool lockAcquired = false;
+            try
             {
+                lockAcquired = await publisherLock.WaitAsync(10_000, cancellationToken).ConfigureAwait(false);
+                if (lockAcquired == false)
+                {
+                    throw new TimeoutException("Unable to acquire lock for publisher channel resolver.");
+                }
+
                 channel = GetExistingChannel(channelKey);
 
                 if (channel?.IsClosed == true)
@@ -29,34 +38,39 @@ public class PublisherChannelResolver : ChannelResolverBase // channels per exch
 
                 if (channel is null)
                 {
-                    var connection = connectionResolver.Resolve(connectionKey, options);
-                    IModel scopedChannel = CreateModelForPublisher(connection);
+                    IConnection connection = await connectionResolver.ResolveAsync(connectionKey, options, cancellationToken).ConfigureAwait(false);
+                    IChannel scopedChannel = await CreateChannelForPublisherAsync(connection, cancellationToken).ConfigureAwait(false);
                     try
                     {
                         if (string.IsNullOrEmpty(exchange) == false)
                         {
-                            scopedChannel.ExchangeDeclarePassive(exchange);
+                            await scopedChannel.ExchangeDeclarePassiveAsync(exchange, cancellationToken).ConfigureAwait(false);
                         }
                     }
                     catch (OperationInterruptedException)
                     {
                         scopedChannel.Dispose();
-                        scopedChannel = CreateModelForPublisher(connection);
-                        scopedChannel.ExchangeDeclare(exchange, ExchangeType.Direct, true);
+                        scopedChannel = await CreateChannelForPublisherAsync(connection).ConfigureAwait(false);
+                        await scopedChannel.ExchangeDeclareAsync(exchange, ExchangeType.Direct, true).ConfigureAwait(false);
                     }
 
                     channels.Add(channelKey, scopedChannel);
                 }
+            }
+            finally
+            {
+                if (lockAcquired) // only release if we acquired the lock, otherwise it will throw an exception if we exceed the max count of allowed threads
+                    publisherLock?.Release();
             }
         }
 
         return GetExistingChannel(channelKey);
     }
 
-    private IModel CreateModelForPublisher(IConnection connection)
+    private async Task<IChannel> CreateChannelForPublisherAsync(IConnection connection, CancellationToken cancellationToken = default)
     {
-        IModel channel = connection.CreateModel();
-        channel.ConfirmSelect();
+        CreateChannelOptions channelOpts = new CreateChannelOptions(publisherConfirmationsEnabled: true, publisherConfirmationTrackingEnabled: false);
+        IChannel channel = await connection.CreateChannelAsync(channelOpts, cancellationToken).ConfigureAwait(false);
 
         return channel;
     }

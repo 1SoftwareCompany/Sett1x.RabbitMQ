@@ -5,22 +5,18 @@ namespace GG.Consumer;
 
 public class Worker : BackgroundService
 {
-    private readonly SettixRabbitMqStartup _rabbitMqStartup;
     private readonly SettixRabbitMqConsumerFactory _consumerFactory;
     private readonly ILogger<Worker> _logger;
 
-    public Worker(SettixRabbitMqStartup rabbitMqStartup, SettixRabbitMqConsumerFactory consumerFactory, ILogger<Worker> logger)
+    public Worker(SettixRabbitMqConsumerFactory consumerFactory, ILogger<Worker> logger)
     {
-        _rabbitMqStartup = rabbitMqStartup;
         _consumerFactory = consumerFactory;
         _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _rabbitMqStartup.Start("giService");
-
-        _consumerFactory.CreateAndStartConsumer("giService", stoppingToken);
+        await _consumerFactory.CreateAndStartConsumerAsync("destination", stoppingToken).ConfigureAwait(false);
 
         while (!stoppingToken.IsCancellationRequested)
         {

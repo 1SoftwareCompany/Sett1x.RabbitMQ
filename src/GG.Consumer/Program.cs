@@ -6,7 +6,7 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddHostedService<Worker>();
 
 builder.Services.AddLogging();
-builder.Services.AddSettixRabbitMqConsumer();
+builder.Services.AddSettix();
 builder.Services.AddSingleton<ISettixConfigurationMessageProcessor, TestProcessor>();
 
 var host = builder.Build();

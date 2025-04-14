@@ -4,16 +4,16 @@ using RabbitMQ.Client.Exceptions;
 
 namespace One.Settix.RabbitMQ.Bootstrap;
 
-public sealed class RabbitMqConnectionFactory : IRabbitMqConnectionFactory
+public sealed class SettixRabbitMqConnectionFactory
 {
-    private readonly ILogger<RabbitMqConnectionFactory> logger;
+    private readonly ILogger<SettixRabbitMqConnectionFactory> logger;
 
-    public RabbitMqConnectionFactory(ILogger<RabbitMqConnectionFactory> logger)
+    public SettixRabbitMqConnectionFactory(ILogger<SettixRabbitMqConnectionFactory> logger)
     {
         this.logger = logger;
     }
 
-    public IConnection CreateConnectionWithOptions(RabbitMqOptions options)
+    public async Task<IConnection> CreateConnectionWithOptionsAsync(RabbitMqOptions options, CancellationToken cancellationToken = default)
     {
         logger.LogDebug("Loaded Sett1x.RabbitMQ options are {@Options}", options);
 
@@ -28,12 +28,11 @@ public sealed class RabbitMqConnectionFactory : IRabbitMqConnectionFactory
                 connectionFactory.UserName = options.Username;
                 connectionFactory.Password = options.Password;
                 connectionFactory.VirtualHost = options.VHost;
-                connectionFactory.DispatchConsumersAsync = true;
                 connectionFactory.AutomaticRecoveryEnabled = true;
                 connectionFactory.Ssl.Enabled = options.UseSsl;
                 connectionFactory.EndpointResolverFactory = (_) => MultipleEndpointResolver.ComposeEndpointResolver(options);
 
-                return connectionFactory.CreateConnection();
+                return await connectionFactory.CreateConnectionAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {

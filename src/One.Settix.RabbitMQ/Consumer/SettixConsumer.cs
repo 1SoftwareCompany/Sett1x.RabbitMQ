@@ -2,41 +2,46 @@
 using One.Settix.RabbitMQ.SettixConfigurationMessageProcessors;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using System;
 using System.Text;
 using System.Text.Json;
 
 namespace One.Settix.RabbitMQ.Consumer;
 
-public sealed class AsyncConsumer : AsyncEventingBasicConsumer
+public sealed class SettixConsumer : AsyncEventingBasicConsumer
 {
-    private bool isСurrentlyConsuming;
+    private bool isCurrentlyConsuming;
 
     private readonly ISettixConfigurationMessageProcessor _settixConfigurationMessageProcessor;
-    private readonly IModel _model;
+    private readonly IChannel _channel;
     private readonly ILogger _logger;
 
     private const string MessageType = "settix-message-type";
 
-    public AsyncConsumer(string queuName, ISettixConfigurationMessageProcessor settixConfigurationMessageProcessor, IModel model, ILogger logger) : base(model)
+    public SettixConsumer(ISettixConfigurationMessageProcessor settixConfigurationMessageProcessor, IChannel channel, ILogger logger) : base(channel)
     {
-        model.BasicQos(0, 1, false); // prefetch allow to avoid buffer of messages on the flight
-        model.BasicConsume(queuName, false, string.Empty, this); // we should use autoAck: false to avoid messages loosing
-
         _settixConfigurationMessageProcessor = settixConfigurationMessageProcessor;
-        _model = model;
+        _channel = channel;
         _logger = logger;
-        isСurrentlyConsuming = false;
-        Received += AsyncListener_Received;
+        isCurrentlyConsuming = false;
+        ReceivedAsync += AsyncListener_Received;
+    }
+
+    public async Task ConfigureConsumerAsync(string queueName)
+    {
+        if (_channel is not null && _channel.IsOpen)
+        {
+            await _channel.BasicQosAsync(0, 1, false); // prefetch allow to avoid buffer of messages on the flight
+            await _channel.BasicConsumeAsync(queueName, false, string.Empty, this); // we should use autoAck: false to avoid messages loosing
+        }
     }
 
     public async Task StopAsync()
     {
         // 1. We detach the listener so ther will be no new messages coming from the queue
-        Received -= AsyncListener_Received;
+        ReceivedAsync -= AsyncListener_Received;
 
         // 2. Wait to handle any messages in progress
-        while (isСurrentlyConsuming)
+        while (isCurrentlyConsuming)
         {
             // We are trying to wait all consumers to finish their current work.
             // Ofcourse the host could be forcibly shut down but we are doing our best.
@@ -44,19 +49,19 @@ public sealed class AsyncConsumer : AsyncEventingBasicConsumer
             await Task.Delay(10).ConfigureAwait(false);
         }
 
-        if (_model.IsOpen)
-            _model.Abort();
+        if (_channel.IsOpen)
+            await _channel.AbortAsync().ConfigureAwait(false);
     }
 
-    private async Task AsyncListener_Received(object sender, BasicDeliverEventArgs @event)
+    private async Task AsyncListener_Received(object sender, BasicDeliverEventArgs configurationMessage)
     {
         try
         {
             _logger.LogDebug("Message received. Sender {sender}.", sender.GetType().Name);
-            isСurrentlyConsuming = true;
+            isCurrentlyConsuming = true;
 
             if (sender is AsyncEventingBasicConsumer consumer)
-                await ProcessAsync(@event, consumer).ConfigureAwait(false);
+                await ProcessAsync(configurationMessage, consumer).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -65,7 +70,7 @@ public sealed class AsyncConsumer : AsyncEventingBasicConsumer
         }
         finally
         {
-            isСurrentlyConsuming = false;
+            isCurrentlyConsuming = false;
         }
     }
 
@@ -79,17 +84,17 @@ public sealed class AsyncConsumer : AsyncEventingBasicConsumer
             {
                 switch (contract)
                 {
-                    case ConfigurationRequest.ContractId: // TODO: use the contract id
-                        await ProcessConfigurationRequestAsync(ev, consumer).ConfigureAwait(false);
+                    case ConfigureService.ContractId:
+                        await ProcessConfigureServiceAsync(ev, consumer).ConfigureAwait(false);
                         break;
-                    case ConfigurationResponse.ContractId:
-                        await ProcessConfigurationResponseAsync(ev, consumer).ConfigureAwait(false);
+                    case ServiceConfigured.ContractId:
+                        await ProcessServiceConfiguredAsync(ev, consumer).ConfigureAwait(false);
                         break;
-                    case RemoveConfigurationRequest.ContractId:
-                        await ProcessRemoveConfigurationRequestAsync(ev, consumer).ConfigureAwait(false);
+                    case RemoveConfiguration.ContractId:
+                        await ProcessRemoveConfigurationAsync(ev, consumer).ConfigureAwait(false);
                         break;
-                    case RemoveConfigurationResponse.ContractId:
-                        await ProcessRemoveConfigurationResponseAsync(ev, consumer).ConfigureAwait(false);
+                    case ConfigurationRemoved.ContractId:
+                        await ProcessConfigurationRemovedAsync(ev, consumer).ConfigureAwait(false);
                         break;
                     default:
                         _logger.LogError("Mising MessageType {MessageType}, can't desialize message {message}", MessageType, Convert.ToBase64String(ev.Body.ToArray()));
@@ -106,13 +111,13 @@ public sealed class AsyncConsumer : AsyncEventingBasicConsumer
             _logger.LogError("Missing MessageType {MessageType}, can't deserialize message {message}", MessageType, Convert.ToBase64String(ev.Body.ToArray()));
         }
 
-        Ack(ev, consumer);
+        await Ack(ev, consumer).ConfigureAwait(false);
 
-        static void Ack(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
+        async Task Ack(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
         {
-            if (consumer.Model.IsOpen)
+            if (consumer.Channel.IsOpen)
             {
-                consumer.Model.BasicAck(ev.DeliveryTag, false);
+                await consumer.Channel.BasicAckAsync(ev.DeliveryTag, false).ConfigureAwait(false);
             }
         }
     }
@@ -123,27 +128,27 @@ public sealed class AsyncConsumer : AsyncEventingBasicConsumer
         return Encoding.UTF8.GetString(headerBytes);
     }
 
-    private async Task ProcessConfigurationRequestAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
+    private async Task ProcessConfigureServiceAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
     {
-        ConfigurationRequest request = JsonSerializer.Deserialize<ConfigurationRequest>(ev.Body.ToArray());
+        ConfigureService request = JsonSerializer.Deserialize<ConfigureService>(ev.Body.ToArray());
         await _settixConfigurationMessageProcessor.ProcessAsync(request).ConfigureAwait(false);
     }
 
-    private async Task ProcessConfigurationResponseAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
+    private async Task ProcessServiceConfiguredAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
     {
-        ConfigurationResponse response = JsonSerializer.Deserialize<ConfigurationResponse>(ev.Body.ToArray());
+        ServiceConfigured response = JsonSerializer.Deserialize<ServiceConfigured>(ev.Body.ToArray());
         await _settixConfigurationMessageProcessor.ProcessAsync(response).ConfigureAwait(false);
     }
 
-    private async Task ProcessRemoveConfigurationRequestAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
+    private async Task ProcessRemoveConfigurationAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
     {
-        RemoveConfigurationRequest request = JsonSerializer.Deserialize<RemoveConfigurationRequest>(ev.Body.ToArray());
+        RemoveConfiguration request = JsonSerializer.Deserialize<RemoveConfiguration>(ev.Body.ToArray());
         await _settixConfigurationMessageProcessor.ProcessAsync(request).ConfigureAwait(false);
     }
 
-    private async Task ProcessRemoveConfigurationResponseAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
+    private async Task ProcessConfigurationRemovedAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
     {
-        RemoveConfigurationResponse response = JsonSerializer.Deserialize<RemoveConfigurationResponse>(ev.Body.ToArray());
+        ConfigurationRemoved response = JsonSerializer.Deserialize<ConfigurationRemoved>(ev.Body.ToArray());
         await _settixConfigurationMessageProcessor.ProcessAsync(response).ConfigureAwait(false);
     }
 }
