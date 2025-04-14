@@ -1,16 +1,15 @@
-﻿using One.Settix.RabbitMQ.Publisher;
-using RabbitMQ.Client;
+﻿using RabbitMQ.Client;
 
 namespace One.Settix.RabbitMQ.Bootstrap;
 
-public abstract class AsyncChannelResolverBase
+public abstract class ChannelResolverBase
 {
     protected readonly Dictionary<string, IChannel> channels;
-    protected readonly AsyncConnectionResolver connectionResolver;
+    protected readonly ConnectionResolver connectionResolver;
 
     protected static SemaphoreSlim channelResolverLock = new SemaphoreSlim(1, 1); // It's crucial to set values for initial and max count of allowed threads, otherwise it is possible to allow more than expected threads to enter the lock.
 
-    public AsyncChannelResolverBase(AsyncConnectionResolver connectionResolver)
+    public ChannelResolverBase(ConnectionResolver connectionResolver)
     {
         channels = new Dictionary<string, IChannel>();
         this.connectionResolver = connectionResolver;

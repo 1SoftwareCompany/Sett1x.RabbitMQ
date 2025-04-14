@@ -16,7 +16,7 @@ public class Worker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await _consumerFactory.CreateAndStartConsumerAsync("giService", stoppingToken).ConfigureAwait(false);
+        await _consumerFactory.CreateAndStartConsumerAsync("destination", stoppingToken).ConfigureAwait(false);
 
         while (!stoppingToken.IsCancellationRequested)
         {

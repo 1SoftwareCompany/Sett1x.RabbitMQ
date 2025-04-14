@@ -4,11 +4,11 @@ using RabbitMQ.Client.Exceptions;
 
 namespace One.Settix.RabbitMQ.Publisher;
 
-public class AsyncPublisherChannelResolver : AsyncChannelResolverBase // channels per exchange
+public sealed class PublisherChannelResolver : ChannelResolverBase // channels per exchange
 {
     private static SemaphoreSlim publisherLock = new SemaphoreSlim(1, 1); // It's crucial to set values for initial and max count of allowed threads, otherwise it is possible to allow more than expected threads to enter the lock.
 
-    public AsyncPublisherChannelResolver(AsyncConnectionResolver connectionResolver) : base(connectionResolver) { }
+    public PublisherChannelResolver(ConnectionResolver connectionResolver) : base(connectionResolver) { }
 
     public override async ValueTask<IChannel> ResolveAsync(string exchange, RabbitMqOptions options, string serviceKey, CancellationToken cancellationToken = default)
     {

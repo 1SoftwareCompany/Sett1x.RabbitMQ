@@ -8,14 +8,14 @@ namespace One.Settix.RabbitMQ.Consumer;
 
 public sealed class SettixRabbitMqConsumerFactory
 {
-    private AsyncSettixRabbitMqConsumer _consumer;
+    private SettixConsumer _consumer;
     private readonly SettixRabbitMqConfiguration settixRabbitMqConfiguration;
     private readonly ISettixConfigurationMessageProcessor _settixConfigurationMessageProcessor;
     private readonly RabbitMqOptions options;
-    private readonly AsyncConsumerPerQueueChannelResolver _channelResolver;
+    private readonly ConsumerPerQueueChannelResolver _channelResolver;
     private readonly ILogger<SettixRabbitMqConsumerFactory> _logger;
 
-    public SettixRabbitMqConsumerFactory(SettixRabbitMqConfiguration settixRabbitMqConfiguration, ISettixConfigurationMessageProcessor settixConfigurationMessageProcessor, IOptionsMonitor<RabbitMqOptions> optionsMonitor, AsyncConsumerPerQueueChannelResolver channelResolver, ILogger<SettixRabbitMqConsumerFactory> logger)
+    public SettixRabbitMqConsumerFactory(SettixRabbitMqConfiguration settixRabbitMqConfiguration, ISettixConfigurationMessageProcessor settixConfigurationMessageProcessor, IOptionsMonitor<RabbitMqOptions> optionsMonitor, ConsumerPerQueueChannelResolver channelResolver, ILogger<SettixRabbitMqConsumerFactory> logger)
     {
         this.settixRabbitMqConfiguration = settixRabbitMqConfiguration;
         _settixConfigurationMessageProcessor = settixConfigurationMessageProcessor;
@@ -34,7 +34,7 @@ public sealed class SettixRabbitMqConsumerFactory
             IChannel channel = await _channelResolver.ResolveAsync(consumerChannelKey, options, options.VHost, cancellationToken).ConfigureAwait(false);
             string queueName = SettixRabbitMqNamer.GetQueueName(serviceKey);
 
-            _consumer = new AsyncSettixRabbitMqConsumer(_settixConfigurationMessageProcessor, channel, _logger);
+            _consumer = new SettixConsumer(_settixConfigurationMessageProcessor, channel, _logger);
             await _consumer.ConfigureConsumerAsync(queueName).ConfigureAwait(false);
         }
         catch (Exception ex)

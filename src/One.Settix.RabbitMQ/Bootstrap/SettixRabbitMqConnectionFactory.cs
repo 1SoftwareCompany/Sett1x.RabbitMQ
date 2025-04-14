@@ -4,11 +4,11 @@ using RabbitMQ.Client.Exceptions;
 
 namespace One.Settix.RabbitMQ.Bootstrap;
 
-public sealed class AsyncRabbitMqConnectionFactory
+public sealed class SettixRabbitMqConnectionFactory
 {
-    private readonly ILogger<AsyncRabbitMqConnectionFactory> logger;
+    private readonly ILogger<SettixRabbitMqConnectionFactory> logger;
 
-    public AsyncRabbitMqConnectionFactory(ILogger<AsyncRabbitMqConnectionFactory> logger)
+    public SettixRabbitMqConnectionFactory(ILogger<SettixRabbitMqConnectionFactory> logger)
     {
         this.logger = logger;
     }

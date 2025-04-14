@@ -10,14 +10,15 @@ public static class SettixRabbitMqExtensions
 {
     internal static IServiceCollection AddSettixRabbitMqBase(this IServiceCollection services)
     {
-        services.AddSingleton<AsyncRabbitMqConnectionFactory>();
+        services.AddSingleton<SettixRabbitMqConnectionFactory>();
         services.AddSingleton<SettixRabbitMqConfiguration>();
-        services.AddSingleton<AsyncConnectionResolver>();
+        services.AddSingleton<ConnectionResolver>();
+        services.AddSingleton<SettixRabbitMqConsumerFactory>();
 
         return services;
     }
 
-    public static IServiceCollection AddSettixRabbitMqPublisher(this IServiceCollection services)
+    public static IServiceCollection AddSettix(this IServiceCollection services)
     {
         services.AddSettixRabbitMqBase();
 
@@ -26,23 +27,15 @@ public static class SettixRabbitMqExtensions
             configuration.GetRequiredSection("settix:rabbitmq:publisher").Bind(options.Clusters);
         });
 
-        services.AddSingleton<AsyncPublisherChannelResolver>();
-        services.AddSingleton<AsyncSettixRabbitMqPublisher>();
-
-        return services;
-    }
-
-    public static IServiceCollection AddSettixRabbitMqConsumer(this IServiceCollection services)
-    {
-        services.AddSettixRabbitMqBase();
+        services.AddSingleton<PublisherChannelResolver>();
+        services.AddSingleton<SettixPublisher>();
 
         services.AddOptions<RabbitMqOptions>().Configure<IConfiguration>((options, configuration) =>
         {
             configuration.GetRequiredSection("settix:rabbitmq:consumer").Bind(options);
         });
 
-        services.AddSingleton<AsyncConsumerPerQueueChannelResolver>();
-        services.AddSingleton<SettixRabbitMqConsumerFactory>();
+        services.AddSingleton<ConsumerPerQueueChannelResolver>();
 
         return services;
     }

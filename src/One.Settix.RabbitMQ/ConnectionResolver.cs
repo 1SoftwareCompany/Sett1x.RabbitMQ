@@ -1,16 +1,16 @@
 ﻿using One.Settix.RabbitMQ.Bootstrap;
 using RabbitMQ.Client;
 
-namespace One.Settix.RabbitMQ.Publisher;
+namespace One.Settix.RabbitMQ;
 
-public sealed class AsyncConnectionResolver : IAsyncDisposable
+public sealed class ConnectionResolver : IAsyncDisposable
 {
     private readonly Dictionary<string, IConnection> connectionsPerVHost;
-    private readonly AsyncRabbitMqConnectionFactory connectionFactory;
+    private readonly SettixRabbitMqConnectionFactory connectionFactory;
 
     private static SemaphoreSlim connectionResolverLock = new SemaphoreSlim(1, 1); // It's crucial to set values for initial and max count of allowed threads, otherwise it is possible to allow more than expected threads to enter the lock.
 
-    public AsyncConnectionResolver(AsyncRabbitMqConnectionFactory connectionFactory)
+    public ConnectionResolver(SettixRabbitMqConnectionFactory connectionFactory)
     {
         connectionsPerVHost = new Dictionary<string, IConnection>();
         this.connectionFactory = connectionFactory;
