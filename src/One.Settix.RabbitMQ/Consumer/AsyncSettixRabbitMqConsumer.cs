@@ -84,16 +84,16 @@ public sealed class AsyncSettixRabbitMqConsumer : AsyncEventingBasicConsumer
             {
                 switch (contract)
                 {
-                    case ConfigurationRequest.ContractId:
+                    case ConfigureService.ContractId:
                         await ProcessConfigurationRequestAsync(ev, consumer).ConfigureAwait(false);
                         break;
-                    case ConfigurationResponse.ContractId:
+                    case ServiceConfigured.ContractId:
                         await ProcessConfigurationResponseAsync(ev, consumer).ConfigureAwait(false);
                         break;
-                    case RemoveConfigurationRequest.ContractId:
+                    case RemoveConfiguration.ContractId:
                         await ProcessRemoveConfigurationRequestAsync(ev, consumer).ConfigureAwait(false);
                         break;
-                    case RemoveConfigurationResponse.ContractId:
+                    case ConfigurationRemoved.ContractId:
                         await ProcessRemoveConfigurationResponseAsync(ev, consumer).ConfigureAwait(false);
                         break;
                     default:
@@ -130,25 +130,25 @@ public sealed class AsyncSettixRabbitMqConsumer : AsyncEventingBasicConsumer
 
     private async Task ProcessConfigurationRequestAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
     {
-        ConfigurationRequest request = JsonSerializer.Deserialize<ConfigurationRequest>(ev.Body.ToArray());
+        ConfigureService request = JsonSerializer.Deserialize<ConfigureService>(ev.Body.ToArray());
         await _settixConfigurationMessageProcessor.ProcessAsync(request).ConfigureAwait(false);
     }
 
     private async Task ProcessConfigurationResponseAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
     {
-        ConfigurationResponse response = JsonSerializer.Deserialize<ConfigurationResponse>(ev.Body.ToArray());
+        ServiceConfigured response = JsonSerializer.Deserialize<ServiceConfigured>(ev.Body.ToArray());
         await _settixConfigurationMessageProcessor.ProcessAsync(response).ConfigureAwait(false);
     }
 
     private async Task ProcessRemoveConfigurationRequestAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
     {
-        RemoveConfigurationRequest request = JsonSerializer.Deserialize<RemoveConfigurationRequest>(ev.Body.ToArray());
+        RemoveConfiguration request = JsonSerializer.Deserialize<RemoveConfiguration>(ev.Body.ToArray());
         await _settixConfigurationMessageProcessor.ProcessAsync(request).ConfigureAwait(false);
     }
 
     private async Task ProcessRemoveConfigurationResponseAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
     {
-        RemoveConfigurationResponse response = JsonSerializer.Deserialize<RemoveConfigurationResponse>(ev.Body.ToArray());
+        ConfigurationRemoved response = JsonSerializer.Deserialize<ConfigurationRemoved>(ev.Body.ToArray());
         await _settixConfigurationMessageProcessor.ProcessAsync(response).ConfigureAwait(false);
     }
 }

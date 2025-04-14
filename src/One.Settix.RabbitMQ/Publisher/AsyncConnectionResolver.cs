@@ -1,51 +1,64 @@
 ﻿using One.Settix.RabbitMQ.Bootstrap;
 using RabbitMQ.Client;
-using System.Collections.Concurrent;
 
 namespace One.Settix.RabbitMQ.Publisher;
 
-public class AsyncConnectionResolver : IAsyncDisposable
+public sealed class AsyncConnectionResolver : IAsyncDisposable
 {
-    private readonly ConcurrentDictionary<string, IConnection> connectionsPerVHost;
-    private readonly IAsyncRabbitMqConnectionFactory connectionFactory;
+    private readonly Dictionary<string, IConnection> connectionsPerVHost;
+    private readonly AsyncRabbitMqConnectionFactory connectionFactory;
 
     private static SemaphoreSlim connectionResolverLock = new SemaphoreSlim(1, 1); // It's crucial to set values for initial and max count of allowed threads, otherwise it is possible to allow more than expected threads to enter the lock.
 
-    public AsyncConnectionResolver(IAsyncRabbitMqConnectionFactory connectionFactory)
+    public AsyncConnectionResolver(AsyncRabbitMqConnectionFactory connectionFactory)
     {
-        connectionsPerVHost = new ConcurrentDictionary<string, IConnection>();
+        connectionsPerVHost = new Dictionary<string, IConnection>();
         this.connectionFactory = connectionFactory;
     }
 
-    public async Task<IConnection> ResolveAsync(string key, RabbitMqOptions options)
+    public async Task<IConnection> ResolveAsync(string key, RabbitMqOptions options, CancellationToken cancellationToken = default)
     {
         IConnection connection = GetExistingConnection(key);
 
         if (connection is null || connection.IsOpen == false)
         {
-            bool lockTaken = false;
+            bool lockAcquired = false;
             try
             {
-                lockTaken = await connectionResolverLock.WaitAsync(10_000).ConfigureAwait(false);
-                if (lockTaken == false)
-                {
+                lockAcquired = await connectionResolverLock.WaitAsync(10_000, cancellationToken).ConfigureAwait(false);
+                if (lockAcquired == false)
                     throw new TimeoutException("Unable to acquire lock for connection resolver.");
-                }
 
                 connection = GetExistingConnection(key);
                 if (connection is null || connection.IsOpen == false)
-                {
-                    connection = await CreateConnectionAsync(key, options).ConfigureAwait(false);
-                }
+                    connection = await CreateConnectionAsync(key, options, cancellationToken).ConfigureAwait(false);
             }
             finally
             {
-                if (lockTaken) // only release if we acquired the lock, otherwise it will throw an exception if we exceed the max count of allowed threads
+                if (lockAcquired) // only release if we acquired the lock, otherwise it will throw an exception if we exceed the max count of allowed threads
                     connectionResolverLock?.Release();
             }
         }
 
         return connection;
+    }
+
+    /// <summary>
+    /// For some reason the analyzer (as of today) reports CA1816 which does not make sense for DisposeAsync()
+    /// </summary>
+    /// <returns></returns>
+    public async ValueTask DisposeAsync()
+    {
+        List<Task> closingConnections = new List<Task>();
+        foreach (KeyValuePair<string, IConnection> connection in connectionsPerVHost)
+        {
+            Task closeTask = connection.Value.CloseAsync(TimeSpan.FromSeconds(5));
+            closingConnections.Add(closeTask);
+        }
+
+        await Task.WhenAll(closingConnections);
+
+        connectionsPerVHost.Clear();
     }
 
     private IConnection GetExistingConnection(string key)
@@ -55,28 +68,20 @@ public class AsyncConnectionResolver : IAsyncDisposable
         return connection;
     }
 
-    private async Task<IConnection> CreateConnectionAsync(string key, RabbitMqOptions options)
+    private async Task<IConnection> CreateConnectionAsync(string key, RabbitMqOptions options, CancellationToken cancellationToken = default)
     {
-        IConnection connection = await connectionFactory.CreateConnectionWithOptionsAsync(options).ConfigureAwait(false);
+        IConnection connection = await connectionFactory.CreateConnectionWithOptionsAsync(options, cancellationToken).ConfigureAwait(false);
 
         if (connectionsPerVHost.TryGetValue(key, out _))
         {
-            if (connectionsPerVHost.TryRemove(key, out _))
-                connectionsPerVHost.TryAdd(key, connection);
+            if (connectionsPerVHost.Remove(key, out _))
+                connectionsPerVHost.Add(key, connection);
         }
         else
         {
-            connectionsPerVHost.TryAdd(key, connection);
+            connectionsPerVHost.Add(key, connection);
         }
 
         return connection;
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        foreach (var connection in connectionsPerVHost)
-        {
-            await connection.Value.CloseAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
-        }
     }
 }

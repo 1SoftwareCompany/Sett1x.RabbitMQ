@@ -3,11 +3,16 @@
 namespace One.Settix.RabbitMQ.SettixConfigurationMessageProcessors;
 
 [DataContract(Name = ContractId)]
-public sealed class RemoveConfigurationResponse
+public sealed class ConfigurationRemoved : IInterServiceConfigurable
 {
     internal const string ContractId = "b810388b-d723-4c93-8a03-ee00af788ba2";
 
-    public RemoveConfigurationResponse(string tenant, RemoveConfigurationRequest requestPayload, bool isRestartRequired, Dictionary<string, string> data, bool isSuccess, DateTimeOffset timestamp)
+    ConfigurationRemoved()
+    {
+        Data = new Dictionary<string, string>();
+    }
+
+    public ConfigurationRemoved(string tenant, RemoveConfiguration requestPayload, bool isRestartRequired, Dictionary<string, string> data, bool isSuccess, DateTimeOffset timestamp)
     {
         Tenant = tenant;
         RequestPayload = requestPayload;
@@ -19,7 +24,7 @@ public sealed class RemoveConfigurationResponse
 
     public string Tenant { get; private set; }
 
-    public RemoveConfigurationRequest RequestPayload { get; private set; }
+    public RemoveConfiguration RequestPayload { get; private set; }
 
     public bool IsRestartRequired { get; private set; }
 
@@ -28,4 +33,8 @@ public sealed class RemoveConfigurationResponse
     public bool IsSuccess { get; private set; }
 
     public DateTimeOffset Timestamp { get; private set; }
+
+    public string Contract => ContractId;
+
+    public string DestinationService => RequestPayload.ServiceKeyToReplyBack;
 }

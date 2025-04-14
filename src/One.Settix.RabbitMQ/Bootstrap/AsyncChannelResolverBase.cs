@@ -16,7 +16,7 @@ public abstract class AsyncChannelResolverBase
         this.connectionResolver = connectionResolver;
     }
 
-    public virtual async ValueTask<IChannel> ResolveAsync(string resolveKey, RabbitMqOptions options, string boundedContext)
+    public virtual async ValueTask<IChannel> ResolveAsync(string resolveKey, RabbitMqOptions options, string boundedContext, CancellationToken cancellationToken = default)
     {
         resolveKey = resolveKey.ToLower();
 
@@ -24,14 +24,12 @@ public abstract class AsyncChannelResolverBase
 
         if (channel is null || channel.IsClosed)
         {
-            bool lockTaken = false;
+            bool lockAcquired = false;
             try
             {
-                lockTaken = await channelResolverLock.WaitAsync(10_000).ConfigureAwait(false);
-                if (lockTaken == false)
-                {
+                lockAcquired = await channelResolverLock.WaitAsync(10_000, cancellationToken).ConfigureAwait(false);
+                if (lockAcquired == false)
                     throw new TimeoutException("Unable to acquire lock for channel resolver.");
-                }
 
                 channel = GetExistingChannel(resolveKey);
 
@@ -43,16 +41,16 @@ public abstract class AsyncChannelResolverBase
 
                 if (channel is null)
                 {
-                    var connection = await connectionResolver.ResolveAsync(boundedContext, options).ConfigureAwait(false);
+                    var connection = await connectionResolver.ResolveAsync(boundedContext, options, cancellationToken).ConfigureAwait(false);
                     CreateChannelOptions channelOpts = new CreateChannelOptions(publisherConfirmationsEnabled: true, publisherConfirmationTrackingEnabled: false);
-                    IChannel scopedChannel = await connection.CreateChannelAsync(channelOpts).ConfigureAwait(false);
+                    IChannel scopedChannel = await connection.CreateChannelAsync(channelOpts, cancellationToken).ConfigureAwait(false);
 
                     channels.Add(resolveKey, scopedChannel);
                 }
             }
             finally
             {
-                if (lockTaken) // only release if we acquired the lock, otherwise it will throw an exception if we exceed the max count of allowed threads
+                if (lockAcquired) // only release if we acquired the lock, otherwise it will throw an exception if we exceed the max count of allowed threads
                     channelResolverLock?.Release();
             }
         }

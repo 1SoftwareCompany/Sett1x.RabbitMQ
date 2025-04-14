@@ -20,122 +20,44 @@ public sealed class AsyncSettixRabbitMqPublisher
         _logger = logger;
     }
 
-    public async Task PublishAsync(ConfigurationRequest message)
-    {
-        string exchangeName = SettixRabbitMqNamer.GetExchangeName();
-
-        try
-        {
-            byte[] body = JsonSerializer.SerializeToUtf8Bytes(message);
-
-            foreach (var option in options.Clusters)
-            {
-                string routingKey = SettixRabbitMqNamer.GetRoutingKey(message.ServiceKey);
-
-                IChannel exchangeChannel = await _channelResolver.ResolveAsync(exchangeName, option, message.ServiceKey).ConfigureAwait(false);
-                BasicProperties props = BuildProps(ConfigurationRequest.ContractId);
-
-                await exchangeChannel.BasicPublishAsync(exchangeName, routingKey, false, props, body).ConfigureAwait(false);
-
-                _logger.LogInformation("Published message: {message}", message);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to publish message: {message} to {exchange}", message, exchangeName);
-        }
-    }
-
     /// <summary>
-    /// Publishes the response of the configured service
+    /// Publishes configuration message
     /// </summary>
     /// <param name="message">The message that contains the response of the configured service</param>
-    /// <param name="serviceKey">The key that will be used to construct the routing key <see cref="SettixRabbitMqNamer.GetRoutingKey"/> where the message will be published to</param>
-    public async Task PublishAsync(ConfigurationResponse message, string serviceKey)
+    public async Task PublishAsync<T>(T message, CancellationToken cancellationToken = default) where T : IInterServiceConfigurable
     {
         string exchangeName = SettixRabbitMqNamer.GetExchangeName();
 
         try
         {
             byte[] body = JsonSerializer.SerializeToUtf8Bytes(message);
+            List<Task> publishTasks = new List<Task>();
 
-            foreach (var option in options.Clusters)
+            foreach (RabbitMqOptions option in options.Clusters)
             {
-                string routingKey = SettixRabbitMqNamer.GetRoutingKey(serviceKey);
-
-                IChannel exchangeChannel = await _channelResolver.ResolveAsync(exchangeName, option, serviceKey).ConfigureAwait(false);
-                BasicProperties props = BuildProps(ConfigurationResponse.ContractId);
-
-                await exchangeChannel.BasicPublishAsync(exchangeName, routingKey, false, props, body).ConfigureAwait(false);
-
-                _logger.LogInformation("Published response message: {@message}", message);
+                Task publishTask = PublishToServiceAsync(message.DestinationService, option, message.Contract, body, cancellationToken);
+                publishTasks.Add(publishTask);
             }
+
+            await Task.WhenAll(publishTasks).ConfigureAwait(false);
+
+            _logger.LogInformation("Published message: {@message}", message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to publish response message: {@message} to {exchange}", message, exchangeName);
+            _logger.LogError(ex, "Failed to publish message: {@message} to {exchange}", message, exchangeName);
         }
     }
 
-    /// <summary>
-    /// Publishes the message that will remove the configuration from the configured service.
-    /// </summary>
-    /// <param name="message"></param>
-    public async Task PublishAsync(RemoveConfigurationRequest message)
+    private async Task PublishToServiceAsync(string serviceKey, RabbitMqOptions option, string bodyContract, byte[] body, CancellationToken cancellationToken)
     {
         string exchangeName = SettixRabbitMqNamer.GetExchangeName();
+        string routingKey = SettixRabbitMqNamer.GetRoutingKey(serviceKey);
 
-        try
-        {
-            byte[] body = JsonSerializer.SerializeToUtf8Bytes(message);
+        IChannel exchangeChannel = await _channelResolver.ResolveAsync(exchangeName, option, serviceKey, cancellationToken).ConfigureAwait(false);
+        BasicProperties props = BuildProps(bodyContract);
 
-            foreach (var option in options.Clusters)
-            {
-                string routingKey = SettixRabbitMqNamer.GetRoutingKey(message.ServiceKey);
-
-                IChannel exchangeChannel = await _channelResolver.ResolveAsync(exchangeName, option, message.ServiceKey).ConfigureAwait(false);
-                BasicProperties props = BuildProps(RemoveConfigurationRequest.ContractId);
-
-                await exchangeChannel.BasicPublishAsync(exchangeName, routingKey, false, props, body).ConfigureAwait(false);
-
-                _logger.LogInformation("Published message: {message}", message);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to publish message: {message} to {exchange}", message, exchangeName);
-        }
-    }
-
-    /// <summary>
-    /// Publishes the response of removing the configuration from the configured service
-    /// </summary>
-    /// <param name="message">The message that contains the response of the configured service</param>
-    /// <param name="serviceKey">The key that will be used to construct the routing key <see cref="SettixRabbitMqNamer.GetRoutingKey"/> where the message will be published to</param>
-    public async Task PublishAsync(RemoveConfigurationResponse message, string serviceKey)
-    {
-        string exchangeName = SettixRabbitMqNamer.GetExchangeName();
-
-        try
-        {
-            byte[] body = JsonSerializer.SerializeToUtf8Bytes(message);
-
-            foreach (var option in options.Clusters)
-            {
-                string routingKey = SettixRabbitMqNamer.GetRoutingKey(serviceKey);
-
-                IChannel exchangeChannel = await _channelResolver.ResolveAsync(exchangeName, option, serviceKey).ConfigureAwait(false);
-                BasicProperties props = BuildProps(RemoveConfigurationResponse.ContractId);
-
-                await exchangeChannel.BasicPublishAsync(exchangeName, routingKey, false, props, body).ConfigureAwait(false);
-
-                _logger.LogInformation("Published response message: {@message}", message);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to publish response message: {@message} to {exchange}", message, exchangeName);
-        }
+        await exchangeChannel.BasicPublishAsync(exchangeName, routingKey, false, props, body, cancellationToken).ConfigureAwait(false);
     }
 
     private static BasicProperties BuildProps(string contractId)

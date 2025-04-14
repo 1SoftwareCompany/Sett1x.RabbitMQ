@@ -9,14 +9,15 @@ namespace One.Settix.RabbitMQ.Consumer;
 public sealed class SettixRabbitMqConsumerFactory
 {
     private AsyncSettixRabbitMqConsumer _consumer;
-
+    private readonly SettixRabbitMqConfiguration settixRabbitMqConfiguration;
     private readonly ISettixConfigurationMessageProcessor _settixConfigurationMessageProcessor;
     private readonly RabbitMqOptions options;
     private readonly AsyncConsumerPerQueueChannelResolver _channelResolver;
     private readonly ILogger<SettixRabbitMqConsumerFactory> _logger;
 
-    public SettixRabbitMqConsumerFactory(ISettixConfigurationMessageProcessor settixConfigurationMessageProcessor, IOptionsMonitor<RabbitMqOptions> optionsMonitor, AsyncConsumerPerQueueChannelResolver channelResolver, ILogger<SettixRabbitMqConsumerFactory> logger)
+    public SettixRabbitMqConsumerFactory(SettixRabbitMqConfiguration settixRabbitMqConfiguration, ISettixConfigurationMessageProcessor settixConfigurationMessageProcessor, IOptionsMonitor<RabbitMqOptions> optionsMonitor, AsyncConsumerPerQueueChannelResolver channelResolver, ILogger<SettixRabbitMqConsumerFactory> logger)
     {
+        this.settixRabbitMqConfiguration = settixRabbitMqConfiguration;
         _settixConfigurationMessageProcessor = settixConfigurationMessageProcessor;
         options = optionsMonitor.CurrentValue; //TODO: Implement onChange event
         _channelResolver = channelResolver;
@@ -27,8 +28,10 @@ public sealed class SettixRabbitMqConsumerFactory
     {
         try
         {
+            await settixRabbitMqConfiguration.ConfigureAsync(serviceKey);
+
             string consumerChannelKey = SettixRabbitMqNamer.GetConsumerChannelName(serviceKey);
-            IChannel channel = await _channelResolver.ResolveAsync(consumerChannelKey, options, options.VHost).ConfigureAwait(false);
+            IChannel channel = await _channelResolver.ResolveAsync(consumerChannelKey, options, options.VHost, cancellationToken).ConfigureAwait(false);
             string queueName = SettixRabbitMqNamer.GetQueueName(serviceKey);
 
             _consumer = new AsyncSettixRabbitMqConsumer(_settixConfigurationMessageProcessor, channel, _logger);

@@ -10,8 +10,8 @@ public static class SettixRabbitMqExtensions
 {
     internal static IServiceCollection AddSettixRabbitMqBase(this IServiceCollection services)
     {
-        services.AddSingleton<IAsyncRabbitMqConnectionFactory, AsyncRabbitMqConnectionFactory>();
-        services.AddSingleton<SettixRabbitMqStartup>();
+        services.AddSingleton<AsyncRabbitMqConnectionFactory>();
+        services.AddSingleton<SettixRabbitMqConfiguration>();
         services.AddSingleton<AsyncConnectionResolver>();
 
         return services;

@@ -10,7 +10,7 @@ public class AsyncPublisherChannelResolver : AsyncChannelResolverBase // channel
 
     public AsyncPublisherChannelResolver(AsyncConnectionResolver connectionResolver) : base(connectionResolver) { }
 
-    public override async ValueTask<IChannel> ResolveAsync(string exchange, RabbitMqOptions options, string serviceKey)
+    public override async ValueTask<IChannel> ResolveAsync(string exchange, RabbitMqOptions options, string serviceKey, CancellationToken cancellationToken = default)
     {
         string channelKey = $"{serviceKey}_{exchange}_{options.Server}".ToLower();
         string connectionKey = $"{options.VHost}_{options.Server}".ToLower();
@@ -19,11 +19,11 @@ public class AsyncPublisherChannelResolver : AsyncChannelResolverBase // channel
 
         if (channel is null || channel.IsClosed)
         {
-            bool lockTaken = false;
+            bool lockAcquired = false;
             try
             {
-                lockTaken = await publisherLock.WaitAsync(10_000).ConfigureAwait(false);
-                if (lockTaken == false)
+                lockAcquired = await publisherLock.WaitAsync(10_000, cancellationToken).ConfigureAwait(false);
+                if (lockAcquired == false)
                 {
                     throw new TimeoutException("Unable to acquire lock for publisher channel resolver.");
                 }
@@ -38,13 +38,13 @@ public class AsyncPublisherChannelResolver : AsyncChannelResolverBase // channel
 
                 if (channel is null)
                 {
-                    IConnection connection = await connectionResolver.ResolveAsync(connectionKey, options).ConfigureAwait(false);
-                    IChannel scopedChannel = await CreateChannelForPublisherAsync(connection).ConfigureAwait(false);
+                    IConnection connection = await connectionResolver.ResolveAsync(connectionKey, options, cancellationToken).ConfigureAwait(false);
+                    IChannel scopedChannel = await CreateChannelForPublisherAsync(connection, cancellationToken).ConfigureAwait(false);
                     try
                     {
                         if (string.IsNullOrEmpty(exchange) == false)
                         {
-                            await scopedChannel.ExchangeDeclarePassiveAsync(exchange).ConfigureAwait(false);
+                            await scopedChannel.ExchangeDeclarePassiveAsync(exchange, cancellationToken).ConfigureAwait(false);
                         }
                     }
                     catch (OperationInterruptedException)
@@ -59,7 +59,7 @@ public class AsyncPublisherChannelResolver : AsyncChannelResolverBase // channel
             }
             finally
             {
-                if (lockTaken) // only release if we acquired the lock, otherwise it will throw an exception if we exceed the max count of allowed threads
+                if (lockAcquired) // only release if we acquired the lock, otherwise it will throw an exception if we exceed the max count of allowed threads
                     publisherLock?.Release();
             }
         }
@@ -67,10 +67,10 @@ public class AsyncPublisherChannelResolver : AsyncChannelResolverBase // channel
         return GetExistingChannel(channelKey);
     }
 
-    private async Task<IChannel> CreateChannelForPublisherAsync(IConnection connection)
+    private async Task<IChannel> CreateChannelForPublisherAsync(IConnection connection, CancellationToken cancellationToken = default)
     {
         CreateChannelOptions channelOpts = new CreateChannelOptions(publisherConfirmationsEnabled: true, publisherConfirmationTrackingEnabled: false);
-        IChannel channel = await connection.CreateChannelAsync(channelOpts).ConfigureAwait(false);
+        IChannel channel = await connection.CreateChannelAsync(channelOpts, cancellationToken).ConfigureAwait(false);
 
         return channel;
     }

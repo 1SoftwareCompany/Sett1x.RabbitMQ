@@ -4,7 +4,7 @@ using RabbitMQ.Client.Exceptions;
 
 namespace One.Settix.RabbitMQ.Bootstrap;
 
-public sealed class AsyncRabbitMqConnectionFactory : IAsyncRabbitMqConnectionFactory
+public sealed class AsyncRabbitMqConnectionFactory
 {
     private readonly ILogger<AsyncRabbitMqConnectionFactory> logger;
 
@@ -13,7 +13,7 @@ public sealed class AsyncRabbitMqConnectionFactory : IAsyncRabbitMqConnectionFac
         this.logger = logger;
     }
 
-    public async Task<IConnection> CreateConnectionWithOptionsAsync(RabbitMqOptions options)
+    public async Task<IConnection> CreateConnectionWithOptionsAsync(RabbitMqOptions options, CancellationToken cancellationToken = default)
     {
         logger.LogDebug("Loaded Sett1x.RabbitMQ options are {@Options}", options);
 

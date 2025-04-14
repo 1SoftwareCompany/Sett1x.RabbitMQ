@@ -6,20 +6,25 @@ using RabbitMQ.Client;
 
 namespace One.Settix.RabbitMQ.Bootstrap;
 
-public sealed class SettixRabbitMqStartup
+public sealed class SettixRabbitMqConfiguration
 {
     private readonly RabbitMqClusterOptions _options;
-    private readonly IAsyncRabbitMqConnectionFactory _connectionFactory;
-    private readonly ILogger<SettixRabbitMqStartup> _logger;
+    private readonly AsyncRabbitMqConnectionFactory _connectionFactory;
+    private readonly ILogger<SettixRabbitMqConfiguration> _logger;
 
-    public SettixRabbitMqStartup(IOptionsMonitor<RabbitMqClusterOptions> optionsMonitor, IAsyncRabbitMqConnectionFactory connectionFactory, ILogger<SettixRabbitMqStartup> logger)
+    public SettixRabbitMqConfiguration(IOptionsMonitor<RabbitMqClusterOptions> optionsMonitor, AsyncRabbitMqConnectionFactory connectionFactory, ILogger<SettixRabbitMqConfiguration> logger)
     {
         _options = optionsMonitor.CurrentValue;
         _connectionFactory = connectionFactory;
         _logger = logger;
     }
 
-    public async Task StartAsync(string queuePrefix)
+    /// <summary>
+    /// This method is automatically invoked by <see cref="SettixRabbitMqConsumerFactory"/>
+    /// </summary>
+    /// <param name="queuePrefix"></param>
+    /// <returns></returns>
+    public async Task ConfigureAsync(string queuePrefix)
     {
         try
         {
