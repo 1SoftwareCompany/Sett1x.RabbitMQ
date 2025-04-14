@@ -25,6 +25,7 @@ public sealed class RemoveConfiguration : IInterServiceConfigurable
     public string Tenant { get; private set; }
 
     public string ServiceKeyToConfigure { get; private set; }
+
     public string ServiceKeyToReplyBack { get; private set; }
 
     public Dictionary<string, string> Data { get; private set; }

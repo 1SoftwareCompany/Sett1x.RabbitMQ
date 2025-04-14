@@ -14,9 +14,10 @@ public sealed class ServiceConfigured : IInterServiceConfigurable
 
     public ServiceConfigured(string tenant, ConfigureService requestPayload, bool isRestartRequired, Dictionary<string, string> data, bool isSuccess, DateTimeOffset timestamp)
     {
-        Tenant = tenant;
         if (tenant != requestPayload.Tenant)
             throw new ArgumentException("Tenant mismatch");
+
+        Tenant = tenant;
         RequestPayload = requestPayload;
         IsRestartRequired = isRestartRequired;
         Data = data;
