@@ -28,6 +28,19 @@ stages:
         packageType: 'sdk'
         version: '9.x'
         includePreviewVersions: true
+    - script: |
+        echo "Tag object and the commit it points to:"
+        git show-ref --tags -d | grep v3.0.2-rabbitMQ-6.8.1v.1 || true
+        echo
+        echo "Is that commit reachable from HEAD?"
+        TAG_SHA=$(git show-ref --tags -d \
+                  | grep v3.0.2-rabbitMQ-6.8.1v.1 \
+                  | awk '{print $1}')
+        if [ -n "$TAG_SHA" ]; then
+          git merge-base --is-ancestor "$TAG_SHA" HEAD \
+            && echo "✅ reachable" || echo "❌ NOT reachable"
+        fi
+      displayName: "Where is the first prerelease tag?"
 
     - task: DotNetCoreCLI@2
       name: build
