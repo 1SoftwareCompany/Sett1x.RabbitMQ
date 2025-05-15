@@ -25,7 +25,6 @@ stages:
       fetchDepth: 0    
       fetchTags: true  
 
-
     - task: UseDotNet@2
       inputs:
         packageType: 'sdk'
