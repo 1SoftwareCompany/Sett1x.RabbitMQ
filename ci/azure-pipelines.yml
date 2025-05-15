@@ -4,7 +4,7 @@ variables:
 
 trigger:
   branches:
-    include: [master,beta,preview]
+    include: [master,beta,preview,rabbitMQ-6.8.1v]
   paths:
     exclude: [CHANGELOG.md]
 

@@ -27,6 +27,7 @@ module.exports={
 
   branches: [
     'master',
+    {name: 'rabbitMQ-6.8.1v', channel: 'beta', prerelease: true},
     {name: 'beta', channel: 'beta', prerelease: true},
     {name: 'preview', channel: 'beta', prerelease: true}
   ],
