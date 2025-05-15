@@ -5,7 +5,7 @@ namespace One.Settix.RabbitMQ.SettixConfigurationMessageProcessors;
 [DataContract(Name = ContractId)]
 public sealed class ConfigureService : IInterServiceConfigurable
 {
-    internal const string ContractId = "dd1fe10d-694d-4bff-ba95-c86b74b32ed9";
+    internal const string ContractId = "98a96efe-9bb8-42ef-a379-26871af71a6b";
 
     ConfigureService()
     {

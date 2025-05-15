@@ -5,7 +5,7 @@ namespace One.Settix.RabbitMQ.SettixConfigurationMessageProcessors;
 [DataContract(Name = ContractId)]
 public sealed class RemoveConfiguration : IInterServiceConfigurable
 {
-    internal const string ContractId = "5691b049-add8-4fee-82b5-d4df05097122";
+    internal const string ContractId = "985c9cfd-9a73-4772-b007-365444315588";
 
     RemoveConfiguration()
     {
