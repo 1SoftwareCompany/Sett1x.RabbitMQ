@@ -25,19 +25,6 @@ stages:
       fetchDepth: 0    
       fetchTags: true  
 
-    - script: |
-        echo "Tag object and the commit it points to:"
-        git show-ref --tags -d | grep v3.0.2-rabbitMQ-6.8.1v.1 || true
-        echo
-        echo "Is that commit reachable from HEAD?"
-        TAG_SHA=$(git show-ref --tags -d \
-                  | grep v3.0.2-rabbitMQ-6.8.1v.1 \
-                  | awk '{print $1}')
-        if [ -n "$TAG_SHA" ]; then
-          git merge-base --is-ancestor "$TAG_SHA" HEAD \
-            && echo "✅ reachable" || echo "❌ NOT reachable"
-        fi
-      displayName: "Where is the first prerelease tag?"
 
     - task: UseDotNet@2
       inputs:
@@ -60,7 +47,6 @@ stages:
         targetType: 'inline'
         script: |
           npm install -g semantic-release@22.0.12 @semantic-release/exec@latest @semantic-release/changelog@latest @semantic-release/git@latest
-          time npx semantic-release --no-ci
           time npx semantic-release --no-ci
           # few commands for debugging purposes
           ls -l $STAGING_PATH/*.nupkg
