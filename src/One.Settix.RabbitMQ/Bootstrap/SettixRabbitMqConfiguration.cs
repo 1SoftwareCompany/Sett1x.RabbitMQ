@@ -34,7 +34,7 @@ public sealed class SettixRabbitMqConfiguration
                 await CreateVHost(rmqClient, clusterOption).ConfigureAwait(false);
 
                 using var connection = await _connectionFactory.CreateConnectionWithOptionsAsync(clusterOption).ConfigureAwait(false);
-                using var channel = await connection.CreateChannelAsync().ConfigureAwait(false);
+                using var channel = connection.CreateModel();
                 await RecoverChannelAsync(channel, queuePrefix).ConfigureAwait(false);
             }
 
@@ -45,15 +45,15 @@ public sealed class SettixRabbitMqConfiguration
         }
     }
 
-    private async Task RecoverChannelAsync(IChannel channel, string queuePrefix)
+    private async Task RecoverChannelAsync(IModel channel, string queuePrefix)
     {
         string exchangeName = SettixRabbitMqNamer.GetExchangeName();
         string queueName = SettixRabbitMqNamer.GetQueueName(queuePrefix);
         string routingKey = SettixRabbitMqNamer.GetRoutingKey(queuePrefix);
 
-        await channel.ExchangeDeclareAsync(exchangeName, ExchangeType.Direct, true).ConfigureAwait(false);
-        await channel.QueueDeclareAsync(queueName, true, false, false, null).ConfigureAwait(false);
-        await channel.QueueBindAsync(queueName, exchangeName, routingKey).ConfigureAwait(false);
+        channel.ExchangeDeclare(exchangeName, ExchangeType.Direct, true);
+        channel.QueueDeclare(queueName, true, false, false, null);
+        channel.QueueBind(queueName, exchangeName, routingKey);
     }
 
     private async Task CreateVHost(RabbitMqManagementClient client, RabbitMqOptions options)

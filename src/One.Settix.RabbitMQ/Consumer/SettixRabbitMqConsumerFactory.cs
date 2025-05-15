@@ -31,7 +31,7 @@ public sealed class SettixRabbitMqConsumerFactory
             await settixRabbitMqConfiguration.ConfigureAsync(serviceKey);
 
             string consumerChannelKey = SettixRabbitMqNamer.GetConsumerChannelName(serviceKey);
-            IChannel channel = await _channelResolver.ResolveAsync(consumerChannelKey, options, options.VHost, cancellationToken).ConfigureAwait(false);
+            IModel channel = await _channelResolver.ResolveAsync(consumerChannelKey, options, options.VHost, cancellationToken).ConfigureAwait(false);
             string queueName = SettixRabbitMqNamer.GetQueueName(serviceKey);
 
             _consumer = new SettixConsumer(_settixConfigurationMessageProcessor, channel, _logger);

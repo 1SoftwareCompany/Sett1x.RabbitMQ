@@ -54,15 +54,15 @@ public sealed class SettixPublisher
         string exchangeName = SettixRabbitMqNamer.GetExchangeName();
         string routingKey = SettixRabbitMqNamer.GetRoutingKey(serviceKey);
 
-        IChannel exchangeChannel = await _channelResolver.ResolveAsync(exchangeName, option, serviceKey, cancellationToken).ConfigureAwait(false);
-        BasicProperties props = BuildProps(bodyContract);
+        IModel exchangeChannel = await _channelResolver.ResolveAsync(exchangeName, option, serviceKey, cancellationToken).ConfigureAwait(false);
+        IBasicProperties props = BuildProps(exchangeChannel, bodyContract);
 
-        await exchangeChannel.BasicPublishAsync(exchangeName, routingKey, false, props, body, cancellationToken).ConfigureAwait(false);
+        exchangeChannel.BasicPublish(exchangeName, routingKey, false, props, body);
     }
 
-    private static BasicProperties BuildProps(string contractId)
+    private static IBasicProperties BuildProps(IModel exchangeModel, string contractId)
     {
-        BasicProperties props = new BasicProperties();
+        IBasicProperties props = exchangeModel.CreateBasicProperties();
         props.Persistent = true;
         props.Headers = new Dictionary<string, object>
         {

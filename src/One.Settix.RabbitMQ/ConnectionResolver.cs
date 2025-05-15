@@ -49,14 +49,10 @@ public sealed class ConnectionResolver : IAsyncDisposable
     /// <returns></returns>
     public async ValueTask DisposeAsync()
     {
-        List<Task> closingConnections = new List<Task>();
         foreach (KeyValuePair<string, IConnection> connection in connectionsPerVHost)
         {
-            Task closeTask = connection.Value.CloseAsync(TimeSpan.FromSeconds(5));
-            closingConnections.Add(closeTask);
+            connection.Value.Close(TimeSpan.FromSeconds(5));
         }
-
-        await Task.WhenAll(closingConnections);
 
         connectionsPerVHost.Clear();
     }

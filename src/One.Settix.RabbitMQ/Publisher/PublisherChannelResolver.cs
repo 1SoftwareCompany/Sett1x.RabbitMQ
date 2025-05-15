@@ -10,12 +10,12 @@ public sealed class PublisherChannelResolver : ChannelResolverBase // channels p
 
     public PublisherChannelResolver(ConnectionResolver connectionResolver) : base(connectionResolver) { }
 
-    public override async ValueTask<IChannel> ResolveAsync(string exchange, RabbitMqOptions options, string serviceKey, CancellationToken cancellationToken = default)
+    public override async ValueTask<IModel> ResolveAsync(string exchange, RabbitMqOptions options, string serviceKey, CancellationToken cancellationToken = default)
     {
         string channelKey = $"{serviceKey}_{exchange}_{options.Server}".ToLower();
         string connectionKey = $"{options.VHost}_{options.Server}".ToLower();
 
-        IChannel channel = GetExistingChannel(channelKey);
+        IModel channel = GetExistingChannel(channelKey);
 
         if (channel is null || channel.IsClosed)
         {
@@ -39,19 +39,19 @@ public sealed class PublisherChannelResolver : ChannelResolverBase // channels p
                 if (channel is null)
                 {
                     IConnection connection = await connectionResolver.ResolveAsync(connectionKey, options, cancellationToken).ConfigureAwait(false);
-                    IChannel scopedChannel = await CreateChannelForPublisherAsync(connection, cancellationToken).ConfigureAwait(false);
+                    IModel scopedChannel = CreateChannelForPublisher(connection);
                     try
                     {
                         if (string.IsNullOrEmpty(exchange) == false)
                         {
-                            await scopedChannel.ExchangeDeclarePassiveAsync(exchange, cancellationToken).ConfigureAwait(false);
+                            scopedChannel.ExchangeDeclarePassive(exchange);
                         }
                     }
                     catch (OperationInterruptedException)
                     {
                         scopedChannel.Dispose();
-                        scopedChannel = await CreateChannelForPublisherAsync(connection).ConfigureAwait(false);
-                        await scopedChannel.ExchangeDeclareAsync(exchange, ExchangeType.Direct, true).ConfigureAwait(false);
+                        scopedChannel = CreateChannelForPublisher(connection);
+                        scopedChannel.ExchangeDeclare(exchange, ExchangeType.Direct, true);
                     }
 
                     channels.Add(channelKey, scopedChannel);
@@ -67,10 +67,10 @@ public sealed class PublisherChannelResolver : ChannelResolverBase // channels p
         return GetExistingChannel(channelKey);
     }
 
-    private async Task<IChannel> CreateChannelForPublisherAsync(IConnection connection, CancellationToken cancellationToken = default)
+    private IModel CreateChannelForPublisher(IConnection connection)
     {
-        CreateChannelOptions channelOpts = new CreateChannelOptions(publisherConfirmationsEnabled: true, publisherConfirmationTrackingEnabled: false);
-        IChannel channel = await connection.CreateChannelAsync(channelOpts, cancellationToken).ConfigureAwait(false);
+        IModel channel = connection.CreateModel();
+        channel.ConfirmSelect();
 
         return channel;
     }

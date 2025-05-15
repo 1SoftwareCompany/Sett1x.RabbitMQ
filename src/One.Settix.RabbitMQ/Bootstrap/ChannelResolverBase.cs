@@ -4,22 +4,22 @@ namespace One.Settix.RabbitMQ.Bootstrap;
 
 public abstract class ChannelResolverBase
 {
-    protected readonly Dictionary<string, IChannel> channels;
+    protected readonly Dictionary<string, IModel> channels;
     protected readonly ConnectionResolver connectionResolver;
 
     protected static SemaphoreSlim channelResolverLock = new SemaphoreSlim(1, 1); // It's crucial to set values for initial and max count of allowed threads, otherwise it is possible to allow more than expected threads to enter the lock.
 
     public ChannelResolverBase(ConnectionResolver connectionResolver)
     {
-        channels = new Dictionary<string, IChannel>();
+        channels = new Dictionary<string, IModel>();
         this.connectionResolver = connectionResolver;
     }
 
-    public virtual async ValueTask<IChannel> ResolveAsync(string resolveKey, RabbitMqOptions options, string boundedContext, CancellationToken cancellationToken = default)
+    public virtual async ValueTask<IModel> ResolveAsync(string resolveKey, RabbitMqOptions options, string boundedContext, CancellationToken cancellationToken = default)
     {
         resolveKey = resolveKey.ToLower();
 
-        IChannel channel = GetExistingChannel(resolveKey);
+        IModel channel = GetExistingChannel(resolveKey);
 
         if (channel is null || channel.IsClosed)
         {
@@ -40,9 +40,9 @@ public abstract class ChannelResolverBase
 
                 if (channel is null)
                 {
-                    var connection = await connectionResolver.ResolveAsync(boundedContext, options, cancellationToken).ConfigureAwait(false);
-                    CreateChannelOptions channelOpts = new CreateChannelOptions(publisherConfirmationsEnabled: true, publisherConfirmationTrackingEnabled: false);
-                    IChannel scopedChannel = await connection.CreateChannelAsync(channelOpts, cancellationToken).ConfigureAwait(false);
+                    IConnection connection = await connectionResolver.ResolveAsync(boundedContext, options, cancellationToken).ConfigureAwait(false);
+                    IModel scopedChannel = connection.CreateModel();
+                    scopedChannel.ConfirmSelect();
 
                     channels.Add(resolveKey, scopedChannel);
                 }
@@ -57,9 +57,9 @@ public abstract class ChannelResolverBase
         return GetExistingChannel(resolveKey);
     }
 
-    protected IChannel GetExistingChannel(string resolveKey)
+    protected IModel GetExistingChannel(string resolveKey)
     {
-        channels.TryGetValue(resolveKey, out IChannel channel);
+        channels.TryGetValue(resolveKey, out IModel channel);
 
         return channel;
     }

@@ -29,10 +29,11 @@ public sealed class SettixRabbitMqConnectionFactory
                 connectionFactory.Password = options.Password;
                 connectionFactory.VirtualHost = options.VHost;
                 connectionFactory.AutomaticRecoveryEnabled = true;
+                connectionFactory.DispatchConsumersAsync = true;
                 connectionFactory.Ssl.Enabled = options.UseSsl;
                 connectionFactory.EndpointResolverFactory = (_) => MultipleEndpointResolver.ComposeEndpointResolver(options);
 
-                return await connectionFactory.CreateConnectionAsync().ConfigureAwait(false);
+                return connectionFactory.CreateConnection();
             }
             catch (Exception ex)
             {

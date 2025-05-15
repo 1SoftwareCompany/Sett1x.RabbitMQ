@@ -12,33 +12,33 @@ public sealed class SettixConsumer : AsyncEventingBasicConsumer
     private bool isCurrentlyConsuming;
 
     private readonly ISettixConfigurationMessageProcessor _settixConfigurationMessageProcessor;
-    private readonly IChannel _channel;
+    private readonly IModel _channel;
     private readonly ILogger _logger;
 
     private const string MessageType = "settix-message-type";
 
-    public SettixConsumer(ISettixConfigurationMessageProcessor settixConfigurationMessageProcessor, IChannel channel, ILogger logger) : base(channel)
+    public SettixConsumer(ISettixConfigurationMessageProcessor settixConfigurationMessageProcessor, IModel channel, ILogger logger) : base(channel)
     {
         _settixConfigurationMessageProcessor = settixConfigurationMessageProcessor;
         _channel = channel;
         _logger = logger;
         isCurrentlyConsuming = false;
-        ReceivedAsync += AsyncListener_Received;
+        Received += AsyncListener_Received;
     }
 
     public async Task ConfigureConsumerAsync(string queueName)
     {
         if (_channel is not null && _channel.IsOpen)
         {
-            await _channel.BasicQosAsync(0, 1, false); // prefetch allow to avoid buffer of messages on the flight
-            await _channel.BasicConsumeAsync(queueName, false, string.Empty, this); // we should use autoAck: false to avoid messages loosing
+            _channel.BasicQos(0, 1, false); // prefetch allow to avoid buffer of messages on the flight
+            _channel.BasicConsume(queueName, false, string.Empty, this); // we should use autoAck: false to avoid messages loosing
         }
     }
 
     public async Task StopAsync()
     {
         // 1. We detach the listener so ther will be no new messages coming from the queue
-        ReceivedAsync -= AsyncListener_Received;
+        Received -= AsyncListener_Received;
 
         // 2. Wait to handle any messages in progress
         while (isCurrentlyConsuming)
@@ -50,7 +50,7 @@ public sealed class SettixConsumer : AsyncEventingBasicConsumer
         }
 
         if (_channel.IsOpen)
-            await _channel.AbortAsync().ConfigureAwait(false);
+            _channel.Abort();
     }
 
     private async Task AsyncListener_Received(object sender, BasicDeliverEventArgs configurationMessage)
@@ -115,9 +115,9 @@ public sealed class SettixConsumer : AsyncEventingBasicConsumer
 
         async Task Ack(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
         {
-            if (consumer.Channel.IsOpen)
+            if (consumer.Model.IsOpen)
             {
-                await consumer.Channel.BasicAckAsync(ev.DeliveryTag, false).ConfigureAwait(false);
+                consumer.Model.BasicAck(ev.DeliveryTag, false);
             }
         }
     }
