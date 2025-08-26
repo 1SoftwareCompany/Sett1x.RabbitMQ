@@ -1,9 +1,10 @@
-﻿using System.Net;
+﻿using One.Settix.RabbitMQ.Bootstrap.Management.Model;
+using System.Net;
+using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using One.Settix.RabbitMQ.Bootstrap.Management.Model;
 
 namespace One.Settix.RabbitMQ.Bootstrap.Management
 {
@@ -11,30 +12,36 @@ namespace One.Settix.RabbitMQ.Bootstrap.Management
     {
         private static readonly Regex UrlRegex = new Regex(@"^(http|https):\/\/.+\w$");
 
-        readonly string username;
-        readonly string password;
         readonly int portNumber;
         readonly bool useSsl;
         readonly int sslEnabledPort = 443;
         readonly int sslDisabledPort = 15672;
         readonly JsonSerializerOptions settings;
 
-        readonly bool runningOnMono;
-
-        readonly Action<HttpWebRequest> configureRequest;
-        readonly TimeSpan defaultTimeout = TimeSpan.FromSeconds(20);
-        readonly TimeSpan timeout;
+        private readonly HttpClient client;
 
         private readonly List<string> apiAddressCollection;
         private string lastKnownApiAddress;
 
-        internal RabbitMqManagementClient(RabbitMqOptions settings) : this(settings.ApiAddress ?? settings.Server, settings.Username, settings.Password, useSsl: settings.UseSsl) { }
+        internal RabbitMqManagementClient(IHttpClientFactory httpClientFactory, RabbitMqOptions settings) : this(httpClientFactory, settings.ApiAddress ?? settings.Server, settings.Username, settings.Password, useSsl: settings.UseSsl) { }
 
-        internal RabbitMqManagementClient(string apiAddresses, string username, string password, bool useSsl = false, TimeSpan? timeout = null, Action<HttpWebRequest> configureRequest = null)
+        internal RabbitMqManagementClient(IHttpClientFactory httpClientFactory, string apiAddresses, string username, string password, bool useSsl = false, TimeSpan? timeout = null)
         {
+            if (httpClientFactory == null) throw new ArgumentNullException(nameof(httpClientFactory));
+            if (string.IsNullOrEmpty(username)) throw new ArgumentException("username is null or empty");
+            if (string.IsNullOrEmpty(password)) throw new ArgumentException("password is null or empty");
+
+            client = httpClientFactory.CreateClient("RabbitMqManagementClient");
+            client.Timeout = timeout ?? TimeSpan.FromSeconds(20);
+
+            var byteArray = Encoding.ASCII.GetBytes($"{username}:{password}");
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Basic", Convert.ToBase64String(byteArray));
+
             portNumber = useSsl ? sslEnabledPort : sslDisabledPort;
             this.useSsl = useSsl;
             apiAddressCollection = new List<string>();
+
             string[] parsedAddresses = apiAddresses.Split(',', StringSplitOptions.RemoveEmptyEntries);
             foreach (var apiAddress in parsedAddresses)
             {
@@ -42,19 +49,6 @@ namespace One.Settix.RabbitMQ.Bootstrap.Management
             }
             if (apiAddressCollection.Any() == false) throw new ArgumentException("Invalid API addresses", nameof(apiAddresses));
 
-            if (string.IsNullOrEmpty(username)) throw new ArgumentException("username is null or empty");
-            if (string.IsNullOrEmpty(password)) throw new ArgumentException("password is null or empty");
-
-            if (configureRequest == null)
-            {
-                configureRequest = x => { };
-            }
-
-            this.username = username;
-            this.password = password;
-
-            this.timeout = timeout ?? defaultTimeout;
-            this.configureRequest = configureRequest;
             settings = new JsonSerializerOptions
             {
                 DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
@@ -140,133 +134,34 @@ namespace One.Settix.RabbitMQ.Bootstrap.Management
 
         private async Task PutAsync(string path)
         {
-            var request = CreateRequestForPath(path);
-            request.Method = "PUT";
-            request.ContentType = "application/json";
-
-            using (var response = (HttpWebResponse)await request.GetResponseAsync().ConfigureAwait(false))
-            {
-                // The "Cowboy" server in 3.7.0's Management Client returns 201 Created.
-                // "MochiWeb/1.1 WebMachine/1.10.0 (never breaks eye contact)" in 3.6.1 and previous return 204 No Content
-                // Also acceptable for a PUT response is 200 OK
-                // See also http://stackoverflow.com/questions/797834/should-a-restful-put-operation-return-something
-                if (!(response.StatusCode == HttpStatusCode.OK ||
-                      response.StatusCode == HttpStatusCode.Created ||
-                      response.StatusCode == HttpStatusCode.NoContent))
-                {
-                    throw new UnexpectedHttpStatusCodeException(response.StatusCode);
-                }
-            }
+            var requestUri = BuildEndpointAddress(path);
+            var response = await client.PutAsync(requestUri, new StringContent("", Encoding.UTF8, "application/json"));
+            EnsureSuccess(response);
         }
 
         private async Task PutAsync<T>(string path, T item)
         {
-            var request = CreateRequestForPath(path);
-            request.Method = "PUT";
+            var requestUri = BuildEndpointAddress(path);
+            var json = JsonSerializer.Serialize(item, settings);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            await InsertRequestBodyAsync(request, item).ConfigureAwait(false);
-
-            using (var response = (HttpWebResponse)await request.GetResponseAsync().ConfigureAwait(false))
-            {
-                // The "Cowboy" server in 3.7.0's Management Client returns 201 Created.
-                // "MochiWeb/1.1 WebMachine/1.10.0 (never breaks eye contact)" in 3.6.1 and previous return 204 No Content
-                // Also acceptable for a PUT response is 200 OK
-                // See also http://stackoverflow.com/questions/797834/should-a-restful-put-operation-return-something
-                if (!(response.StatusCode == HttpStatusCode.OK ||
-                      response.StatusCode == HttpStatusCode.Created ||
-                      response.StatusCode == HttpStatusCode.NoContent))
-                {
-                    throw new UnexpectedHttpStatusCodeException(response.StatusCode);
-                }
-            }
+            var response = await client.PutAsync(requestUri, content);
+            EnsureSuccess(response);
         }
 
         private async Task<T> GetAsync<T>(string path, params object[] queryObjects)
         {
-            var request = CreateRequestForPath(path, queryObjects);
+            var requestUri = BuildEndpointAddress(path) + BuildQueryString(queryObjects);
+            var response = await client.GetAsync(requestUri);
 
-            using (var response = (HttpWebResponse)await request.GetResponseAsync().ConfigureAwait(false))
-            {
-                if (response.StatusCode != HttpStatusCode.OK)
-                {
-                    throw new UnexpectedHttpStatusCodeException(response.StatusCode);
-                }
-                return DeserializeResponse<T>(response);
-            }
-        }
+            if (response.StatusCode != HttpStatusCode.OK)
+                throw new UnexpectedHttpStatusCodeException(response.StatusCode);
 
-        private async Task InsertRequestBodyAsync<T>(HttpWebRequest request, T item)
-        {
-            request.ContentType = "application/json";
-
-            var body = JsonSerializer.Serialize(item, settings);
-            using (var requestStream = await request.GetRequestStreamAsync().ConfigureAwait(false))
-            using (var writer = new StreamWriter(requestStream))
-            {
-                writer.Write(body);
-            }
+            var responseBody = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<T>(responseBody, settings)!;
         }
 
         private string SanitiseVhostName(string vhostName) => vhostName.Replace("/", "%2f");
-
-        private T DeserializeResponse<T>(HttpWebResponse response)
-        {
-            var responseBody = GetBodyFromResponse(response);
-            return JsonSerializer.Deserialize<T>(responseBody, settings);
-        }
-
-        private static string GetBodyFromResponse(HttpWebResponse response)
-        {
-            string responseBody;
-            using (var responseStream = response.GetResponseStream())
-            {
-                if (responseStream == null)
-                {
-                    //throw new EasyNetQManagementException("Response stream was null");
-                }
-                using (var reader = new StreamReader(responseStream))
-                {
-                    responseBody = reader.ReadToEnd();
-                }
-            }
-            return responseBody;
-        }
-
-        private HttpWebRequest CreateRequestForPath(string path, object[] queryObjects = null)
-        {
-            var endpointAddress = BuildEndpointAddress(path);
-            var queryString = BuildQueryString(queryObjects);
-
-            var uri = new Uri(endpointAddress + queryString);
-
-            if (runningOnMono)
-            {
-                // unsightly hack to fix path.
-                // The default vHost in RabbitMQ is named '/' which causes all sorts of problems :(
-                // We need to escape it to %2f, but System.Uri then unescapes it back to '/'
-                // The horrible fix is to reset the path field to the original path value, after it's
-                // been set.
-                var pathField = typeof(Uri).GetField("path", BindingFlags.Instance | BindingFlags.NonPublic);
-                if (pathField == null)
-                {
-                    throw new ApplicationException("Could not resolve path field");
-                }
-                var alteredPath = (string)pathField.GetValue(uri);
-                alteredPath = alteredPath.Replace(@"///", @"/%2f/");
-                alteredPath = alteredPath.Replace(@"//", @"/%2f");
-                alteredPath = alteredPath.Replace("+", "%2b");
-                pathField.SetValue(uri, alteredPath);
-            }
-
-            var request = (HttpWebRequest)WebRequest.Create(uri);
-            request.Credentials = new NetworkCredential(username, password);
-            request.Timeout = request.ReadWriteTimeout = (int)timeout.TotalMilliseconds;
-            request.KeepAlive = false; //default WebRequest.KeepAlive to false to resolve spurious 'the request was aborted: the request was canceled' exceptions
-
-            configureRequest(request);
-
-            return request;
-        }
 
         private string BuildEndpointAddress(string path)
         {
@@ -292,22 +187,10 @@ namespace One.Settix.RabbitMQ.Bootstrap.Management
         {
             try
             {
-                HttpWebRequest myRequest = (HttpWebRequest)WebRequest.Create(address);
-                myRequest.Timeout = 1000;
-                HttpWebResponse response = (HttpWebResponse)myRequest.GetResponse();
-
-                if (response.StatusCode == HttpStatusCode.OK)
-                {
-                    response.Close();
-                    return true;
-                }
-                else
-                {
-                    response.Close();
-                    return false;
-                }
+                var response = client.GetAsync(address).GetAwaiter().GetResult();
+                return response.IsSuccessStatusCode;
             }
-            catch (Exception)
+            catch
             {
                 return false;
             }
@@ -340,6 +223,16 @@ namespace One.Settix.RabbitMQ.Bootstrap.Management
                 }
             }
             return queryStringBuilder.ToString();
+        }
+
+        private void EnsureSuccess(HttpResponseMessage response)
+        {
+            if (!(response.StatusCode == HttpStatusCode.OK ||
+                  response.StatusCode == HttpStatusCode.Created ||
+                  response.StatusCode == HttpStatusCode.NoContent))
+            {
+                throw new UnexpectedHttpStatusCodeException(response.StatusCode);
+            }
         }
     }
 }

@@ -39,4 +39,14 @@ public static class SettixRabbitMqExtensions
 
         return services;
     }
+
+    public static IServiceCollection AddHttpClients(this IServiceCollection services)
+    {
+        services.AddHttpClient("RabbitMqManagementClient").ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        });
+
+        return services;
+    }
 }
