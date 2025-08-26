@@ -18,25 +18,17 @@ namespace One.Settix.RabbitMQ.Bootstrap.Management
         readonly int sslDisabledPort = 15672;
         readonly JsonSerializerOptions settings;
 
-        private readonly HttpClient client;
+        private readonly HttpClient _httpClient;
 
         private readonly List<string> apiAddressCollection;
         private string lastKnownApiAddress;
 
-        internal RabbitMqManagementClient(IHttpClientFactory httpClientFactory, RabbitMqOptions settings) : this(httpClientFactory, settings.ApiAddress ?? settings.Server, settings.Username, settings.Password, useSsl: settings.UseSsl) { }
+        internal RabbitMqManagementClient(HttpClient httpClient, RabbitMqOptions settings) : this(httpClient, settings.ApiAddress ?? settings.Server, settings.Username, settings.Password, useSsl: settings.UseSsl) { }
 
-        internal RabbitMqManagementClient(IHttpClientFactory httpClientFactory, string apiAddresses, string username, string password, bool useSsl = false, TimeSpan? timeout = null)
+        internal RabbitMqManagementClient(HttpClient httpClient, string apiAddresses, string username, string password, bool useSsl = false, TimeSpan? timeout = null)
         {
-            if (httpClientFactory == null) throw new ArgumentNullException(nameof(httpClientFactory));
-            if (string.IsNullOrEmpty(username)) throw new ArgumentException("username is null or empty");
-            if (string.IsNullOrEmpty(password)) throw new ArgumentException("password is null or empty");
-
-            client = httpClientFactory.CreateClient("RabbitMqManagementClient");
-            client.Timeout = timeout ?? TimeSpan.FromSeconds(20);
-
-            var byteArray = Encoding.ASCII.GetBytes($"{username}:{password}");
-            client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Basic", Convert.ToBase64String(byteArray));
+            if (httpClient == null) throw new ArgumentNullException(nameof(httpClient));
+            _httpClient = httpClient;
 
             portNumber = useSsl ? sslEnabledPort : sslDisabledPort;
             this.useSsl = useSsl;
@@ -134,25 +126,25 @@ namespace One.Settix.RabbitMQ.Bootstrap.Management
 
         private async Task PutAsync(string path)
         {
-            var requestUri = BuildEndpointAddress(path);
-            var response = await client.PutAsync(requestUri, new StringContent("", Encoding.UTF8, "application/json"));
+            var requestUri = await BuildEndpointAddress(path);
+            var response = await _httpClient.PutAsync(requestUri, new StringContent("", Encoding.UTF8, "application/json"));
             EnsureSuccess(response);
         }
 
         private async Task PutAsync<T>(string path, T item)
         {
-            var requestUri = BuildEndpointAddress(path);
+            var requestUri = await BuildEndpointAddress(path);
             var json = JsonSerializer.Serialize(item, settings);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var response = await client.PutAsync(requestUri, content);
+            var response = await _httpClient.PutAsync(requestUri, content);
             EnsureSuccess(response);
         }
 
         private async Task<T> GetAsync<T>(string path, params object[] queryObjects)
         {
-            var requestUri = BuildEndpointAddress(path) + BuildQueryString(queryObjects);
-            var response = await client.GetAsync(requestUri);
+            var requestUri = await BuildEndpointAddress(path) + BuildQueryString(queryObjects);
+            var response = await _httpClient.GetAsync(requestUri);
 
             if (response.StatusCode != HttpStatusCode.OK)
                 throw new UnexpectedHttpStatusCodeException(response.StatusCode);
@@ -163,17 +155,17 @@ namespace One.Settix.RabbitMQ.Bootstrap.Management
 
         private string SanitiseVhostName(string vhostName) => vhostName.Replace("/", "%2f");
 
-        private string BuildEndpointAddress(string path)
+        private async Task<string> BuildEndpointAddress(string path)
         {
             if (string.IsNullOrEmpty(lastKnownApiAddress) == false)
             {
-                if (IsHostResponding(lastKnownApiAddress))
+                if (await IsHostResponding(lastKnownApiAddress))
                     return string.Format("{0}/api/{1}", lastKnownApiAddress, path);
             }
 
             foreach (var apiAddress in apiAddressCollection)
             {
-                if (IsHostResponding(apiAddress))
+                if (await IsHostResponding(apiAddress))
                 {
                     lastKnownApiAddress = apiAddress;
                     return string.Format("{0}/api/{1}", apiAddress, path);
@@ -183,11 +175,11 @@ namespace One.Settix.RabbitMQ.Bootstrap.Management
             throw new Exception("Unable to connect to any of the provided API hosts.");
         }
 
-        private bool IsHostResponding(string address)
+        private async Task<bool> IsHostResponding(string address)
         {
             try
             {
-                var response = client.GetAsync(address).GetAwaiter().GetResult();
+                var response = await _httpClient.GetAsync(address);
                 return response.IsSuccessStatusCode;
             }
             catch

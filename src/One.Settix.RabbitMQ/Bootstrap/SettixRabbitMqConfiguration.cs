@@ -10,15 +10,15 @@ public sealed class SettixRabbitMqConfiguration
 {
     private readonly RabbitMqClusterOptions _options;
     private readonly SettixRabbitMqConnectionFactory _connectionFactory;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly HttpClient _httpClient;
     private readonly ILogger<SettixRabbitMqConfiguration> _logger;
 
-    public SettixRabbitMqConfiguration(IOptionsMonitor<RabbitMqClusterOptions> optionsMonitor, SettixRabbitMqConnectionFactory connectionFactory, ILogger<SettixRabbitMqConfiguration> logger, IHttpClientFactory httpClientFactory)
+    public SettixRabbitMqConfiguration(IOptionsMonitor<RabbitMqClusterOptions> optionsMonitor, SettixRabbitMqConnectionFactory connectionFactory, ILogger<SettixRabbitMqConfiguration> logger, HttpClient httpClient)
     {
         _options = optionsMonitor.CurrentValue;
         _connectionFactory = connectionFactory;
         _logger = logger;
-        _httpClientFactory = httpClientFactory;
+        _httpClient = httpClient;
     }
 
     /// <summary>
@@ -32,7 +32,7 @@ public sealed class SettixRabbitMqConfiguration
         {
             foreach (RabbitMqOptions clusterOption in _options.Clusters)
             {
-                RabbitMqManagementClient rmqClient = new RabbitMqManagementClient(_httpClientFactory, clusterOption);
+                RabbitMqManagementClient rmqClient = new RabbitMqManagementClient(_httpClient, clusterOption);
                 await CreateVHost(rmqClient, clusterOption).ConfigureAwait(false);
 
                 using var connection = await _connectionFactory.CreateConnectionWithOptionsAsync(clusterOption).ConfigureAwait(false);
