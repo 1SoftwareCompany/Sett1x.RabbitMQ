@@ -42,28 +42,4 @@ public static class SettixRabbitMqExtensions
 
         return services;
     }
-
-    public static IServiceCollection AddHttpClients(this IServiceCollection services, IConfiguration configuration)
-    {
-        var options = new RabbitMqOptions();
-        configuration.GetSection("settix:rabbitmq:consumer").Bind(options);
-
-        if (string.IsNullOrWhiteSpace(options.Username))
-            throw new ArgumentException("RabbitMQ username is null or empty.");
-
-        if (string.IsNullOrWhiteSpace(options.Password))
-            throw new ArgumentException("RabbitMQ password is null or empty.");
-
-        services.AddHttpClient<SettixRabbitMqConfiguration>(client =>
-        {
-            client.Timeout = TimeSpan.FromSeconds(20);
-
-            var byteArray = Encoding.ASCII.GetBytes($"{options.Username}:{options.Password}");
-            client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Basic", Convert.ToBase64String(byteArray));
-        });
-
-        return services;
-
-    }
 }

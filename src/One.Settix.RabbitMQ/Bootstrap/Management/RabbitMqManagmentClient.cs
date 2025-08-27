@@ -1,4 +1,5 @@
-﻿using One.Settix.RabbitMQ.Bootstrap.Management.Model;
+﻿using Microsoft.Extensions.Options;
+using One.Settix.RabbitMQ.Bootstrap.Management.Model;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection;
@@ -23,12 +24,24 @@ namespace One.Settix.RabbitMQ.Bootstrap.Management
         private readonly List<string> apiAddressCollection;
         private string lastKnownApiAddress;
 
-        internal RabbitMqManagementClient(HttpClient httpClient, RabbitMqOptions settings) : this(httpClient, settings.ApiAddress ?? settings.Server, settings.Username, settings.Password, useSsl: settings.UseSsl) { }
+        internal RabbitMqManagementClient(IHttpClientFactory httpClientFactory, RabbitMqOptions settings) : this(httpClientFactory, settings.ApiAddress ?? settings.Server, settings.Username, settings.Password, useSsl: settings.UseSsl) { }
 
-        internal RabbitMqManagementClient(HttpClient httpClient, string apiAddresses, string username, string password, bool useSsl = false, TimeSpan? timeout = null)
+        internal RabbitMqManagementClient(IHttpClientFactory httpClientFactory, string apiAddresses, string username, string password, bool useSsl = false, TimeSpan? timeout = null)
         {
-            if (httpClient == null) throw new ArgumentNullException(nameof(httpClient));
-            _httpClient = httpClient;
+            if (httpClientFactory == null) throw new ArgumentNullException(nameof(httpClientFactory));
+            _httpClient = httpClientFactory.CreateClient();
+
+            if (string.IsNullOrWhiteSpace(username))
+                throw new ArgumentException("RabbitMQ username is null or empty.");
+
+            if (string.IsNullOrWhiteSpace(password))
+                throw new ArgumentException("RabbitMQ password is null or empty.");
+
+            _httpClient.Timeout = timeout ?? TimeSpan.FromSeconds(20);
+
+            var byteArray = Encoding.ASCII.GetBytes($"{username}:{password}");
+            _httpClient.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Basic", Convert.ToBase64String(byteArray));
 
             portNumber = useSsl ? sslEnabledPort : sslDisabledPort;
             this.useSsl = useSsl;

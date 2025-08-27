@@ -8,7 +8,7 @@ builder.Services.AddHostedService<Worker>();
 builder.Services.AddLogging();
 builder.Services.AddSettix();
 builder.Services.AddSingleton<ISettixConfigurationMessageProcessor, TestProcessor>();
-builder.Services.AddHttpClients(builder.Configuration);
+builder.Services.AddHttpClient();
 
 var host = builder.Build();
 host.Run();
