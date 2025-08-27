@@ -1,8 +1,11 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using One.Settix.RabbitMQ.Bootstrap;
+using One.Settix.RabbitMQ.Bootstrap.Management;
 using One.Settix.RabbitMQ.Consumer;
 using One.Settix.RabbitMQ.Publisher;
+using System.Net.Http.Headers;
+using System.Text;
 
 namespace One.Settix.RabbitMQ;
 
