@@ -8,14 +8,16 @@ namespace One.Settix.RabbitMQ.Bootstrap;
 
 public sealed class SettixRabbitMqConfiguration
 {
-    private readonly RabbitMqClusterOptions _options;
+    private readonly RabbitMqOptions _options;
     private readonly SettixRabbitMqConnectionFactory _connectionFactory;
     private readonly ILogger<SettixRabbitMqConfiguration> _logger;
+    private readonly IHttpClientFactory _httpClientFactory;
 
-    public SettixRabbitMqConfiguration(IOptionsMonitor<RabbitMqClusterOptions> optionsMonitor, SettixRabbitMqConnectionFactory connectionFactory, ILogger<SettixRabbitMqConfiguration> logger)
+    public SettixRabbitMqConfiguration(IOptionsMonitor<RabbitMqOptions> optionsMonitor, SettixRabbitMqConnectionFactory connectionFactory, IHttpClientFactory httpClientFactory, ILogger<SettixRabbitMqConfiguration> logger)
     {
         _options = optionsMonitor.CurrentValue;
         _connectionFactory = connectionFactory;
+        _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
 
@@ -28,16 +30,12 @@ public sealed class SettixRabbitMqConfiguration
     {
         try
         {
-            foreach (RabbitMqOptions clusterOption in _options.Clusters)
-            {
-                RabbitMqManagementClient rmqClient = new RabbitMqManagementClient(clusterOption);
-                await CreateVHost(rmqClient, clusterOption).ConfigureAwait(false);
+            RabbitMqManagementClient rmqClient = new RabbitMqManagementClient(_httpClientFactory, _options);
+            await CreateVHost(rmqClient).ConfigureAwait(false);
 
-                using var connection = await _connectionFactory.CreateConnectionWithOptionsAsync(clusterOption).ConfigureAwait(false);
-                using var channel = connection.CreateModel();
-                await RecoverChannelAsync(channel, queuePrefix).ConfigureAwait(false);
-            }
-
+            using var connection = await _connectionFactory.CreateConnectionWithOptionsAsync(_options).ConfigureAwait(false);
+            using var channel = connection.CreateModel();
+            await RecoverChannelAsync(channel, queuePrefix).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -56,14 +54,14 @@ public sealed class SettixRabbitMqConfiguration
         channel.QueueBind(queueName, exchangeName, routingKey);
     }
 
-    private async Task CreateVHost(RabbitMqManagementClient client, RabbitMqOptions options)
+    private async Task CreateVHost(RabbitMqManagementClient client)
     {
         IEnumerable<Vhost> vhosts = await client.GetVHostsAsync().ConfigureAwait(false);
-        if (vhosts.Any(vh => vh.Name == options.VHost) == false)
+        if (vhosts.Any(vh => vh.Name == _options.VHost) == false)
         {
-            var vhost = await client.CreateVirtualHostAsync(options.VHost).ConfigureAwait(false);
+            var vhost = await client.CreateVirtualHostAsync(_options.VHost).ConfigureAwait(false);
             var rmqUsers = await client.GetUsersAsync().ConfigureAwait(false);
-            var rabbitMqUser = rmqUsers.SingleOrDefault(x => x.Name == options.Username);
+            var rabbitMqUser = rmqUsers.SingleOrDefault(x => x.Name == _options.Username);
             var permissionInfo = new PermissionInfo(rabbitMqUser, vhost);
             await client.CreatePermissionAsync(permissionInfo);
         }
