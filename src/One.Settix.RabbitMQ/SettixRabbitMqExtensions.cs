@@ -21,6 +21,7 @@ public static class SettixRabbitMqExtensions
     public static IServiceCollection AddSettix(this IServiceCollection services)
     {
         services.AddSettixRabbitMqBase();
+        services.AddHttpClient();
 
         services.AddOptions<RabbitMqClusterOptions>().Configure<IConfiguration>((options, configuration) =>
         {
