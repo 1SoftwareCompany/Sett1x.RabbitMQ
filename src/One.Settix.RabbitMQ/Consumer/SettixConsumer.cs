@@ -96,6 +96,18 @@ public sealed class SettixConsumer : AsyncEventingBasicConsumer
                     case ConfigurationRemoved.ContractId:
                         await ProcessConfigurationRemovedAsync(ev, consumer).ConfigureAwait(false);
                         break;
+                    case ConfigureServiceV2.ContractId:
+                        await ProcessConfigureServiceV2Async(ev, consumer).ConfigureAwait(false);
+                        break;
+                    case ServiceConfiguredV2.ContractId:
+                        await ProcessServiceConfiguredV2Async(ev, consumer).ConfigureAwait(false);
+                        break;
+                    case RemoveConfigurationV2.ContractId:
+                        await ProcessRemoveConfigurationV2Async(ev, consumer).ConfigureAwait(false);
+                        break;
+                    case ConfigurationRemovedV2.ContractId:
+                        await ProcessConfigurationRemovedV2Async(ev, consumer).ConfigureAwait(false);
+                        break;
                     default:
                         _logger.LogError("Mising MessageType {MessageType}, can't desialize message {message}", MessageType, Convert.ToBase64String(ev.Body.ToArray()));
                         break;
@@ -149,6 +161,31 @@ public sealed class SettixConsumer : AsyncEventingBasicConsumer
     private async Task ProcessConfigurationRemovedAsync(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
     {
         ConfigurationRemoved response = JsonSerializer.Deserialize<ConfigurationRemoved>(ev.Body.ToArray());
+        await _settixConfigurationMessageProcessor.ProcessAsync(response).ConfigureAwait(false);
+    }
+
+    ///////// V2 methods /////////
+    private async Task ProcessConfigureServiceV2Async(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
+    {
+        ConfigureServiceV2 request = JsonSerializer.Deserialize<ConfigureServiceV2>(ev.Body.ToArray());
+        await _settixConfigurationMessageProcessor.ProcessAsync(request).ConfigureAwait(false);
+    }
+
+    private async Task ProcessServiceConfiguredV2Async(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
+    {
+        ServiceConfiguredV2 response = JsonSerializer.Deserialize<ServiceConfiguredV2>(ev.Body.ToArray());
+        await _settixConfigurationMessageProcessor.ProcessAsync(response).ConfigureAwait(false);
+    }
+
+    private async Task ProcessRemoveConfigurationV2Async(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
+    {
+        RemoveConfigurationV2 request = JsonSerializer.Deserialize<RemoveConfigurationV2>(ev.Body.ToArray());
+        await _settixConfigurationMessageProcessor.ProcessAsync(request).ConfigureAwait(false);
+    }
+
+    private async Task ProcessConfigurationRemovedV2Async(BasicDeliverEventArgs ev, AsyncEventingBasicConsumer consumer)
+    {
+        ConfigurationRemovedV2 response = JsonSerializer.Deserialize<ConfigurationRemovedV2>(ev.Body.ToArray());
         await _settixConfigurationMessageProcessor.ProcessAsync(response).ConfigureAwait(false);
     }
 }
