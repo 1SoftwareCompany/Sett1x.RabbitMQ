@@ -49,10 +49,10 @@ public sealed class ServiceConfiguredV2 : IInterServiceConfigurable
 
     ServiceConfiguredV2()
     {
-        Data = new HashSet<ConfigureServiceData>();
+        Data = new Dictionary<string, object>();
     }
 
-    public ServiceConfiguredV2(string tenant, ConfigureServiceV2 requestPayload, bool isRestartRequired, HashSet<ConfigureServiceData> data, bool isSuccess, DateTimeOffset timestamp)
+    public ServiceConfiguredV2(string tenant, ConfigureServiceV2 requestPayload, bool isRestartRequired, Dictionary<string, object> data, bool isSuccess, DateTimeOffset timestamp)
     {
         if (tenant != requestPayload.Tenant)
             throw new ArgumentException("Tenant mismatch");
@@ -71,7 +71,7 @@ public sealed class ServiceConfiguredV2 : IInterServiceConfigurable
 
     public bool IsRestartRequired { get; private set; }
 
-    public HashSet<ConfigureServiceData> Data { get; private set; }
+    public Dictionary<string, object> Data { get; private set; }
 
     public bool IsSuccess { get; private set; }
 

@@ -46,15 +46,15 @@ public sealed class RemoveConfigurationV2 : IInterServiceConfigurable
 
     RemoveConfigurationV2()
     {
-        Data = new HashSet<ConfigureServiceData>();
+        Data = new Dictionary<string, object>();
     }
 
-    public RemoveConfigurationV2(string tenant, string serviceKeyToConfigure, string serviceKeyToReplyBack, HashSet<ConfigureServiceData> data, bool shouldWipeData, DateTimeOffset timestamp)
+    public RemoveConfigurationV2(string tenant, string serviceKeyToConfigure, string serviceKeyToReplyBack, Dictionary<string, object> data, bool shouldWipeData, DateTimeOffset timestamp)
     {
         Tenant = tenant;
         ServiceKeyToConfigure = serviceKeyToConfigure;
         ServiceKeyToReplyBack = serviceKeyToReplyBack;
-        Data = data ?? new HashSet<ConfigureServiceData>();
+        Data = data ?? new Dictionary<string, object>();
         ShouldWipeData = shouldWipeData;
         Timestamp = timestamp;
     }
@@ -65,7 +65,7 @@ public sealed class RemoveConfigurationV2 : IInterServiceConfigurable
 
     public string ServiceKeyToReplyBack { get; private set; }
 
-    public HashSet<ConfigureServiceData> Data { get; private set; }
+    public Dictionary<string, object> Data { get; private set; }
 
     public bool ShouldWipeData { get; private set; }
 
