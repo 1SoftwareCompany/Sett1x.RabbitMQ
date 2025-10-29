@@ -39,39 +39,3 @@ public sealed class RemoveConfiguration : IInterServiceConfigurable
     public string DestinationService => ServiceKeyToConfigure;
 }
 
-[DataContract(Name = ContractId)]
-public sealed class RemoveConfigurationV2 : IInterServiceConfigurable
-{
-    internal const string ContractId = "05bb4603-9c68-4c2b-b23c-c9b43537496d";
-
-    RemoveConfigurationV2()
-    {
-        Data = new HashSet<ConfigureServiceData>();
-    }
-
-    public RemoveConfigurationV2(string tenant, string serviceKeyToConfigure, string serviceKeyToReplyBack, HashSet<ConfigureServiceData> data, bool shouldWipeData, DateTimeOffset timestamp)
-    {
-        Tenant = tenant;
-        ServiceKeyToConfigure = serviceKeyToConfigure;
-        ServiceKeyToReplyBack = serviceKeyToReplyBack;
-        Data = data ?? new HashSet<ConfigureServiceData>();
-        ShouldWipeData = shouldWipeData;
-        Timestamp = timestamp;
-    }
-
-    public string Tenant { get; private set; }
-
-    public string ServiceKeyToConfigure { get; private set; }
-
-    public string ServiceKeyToReplyBack { get; private set; }
-
-    public HashSet<ConfigureServiceData> Data { get; private set; }
-
-    public bool ShouldWipeData { get; private set; }
-
-    public DateTimeOffset Timestamp { get; private set; }
-
-    public string Contract => ContractId;
-
-    public string DestinationService => ServiceKeyToConfigure;
-}

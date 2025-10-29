@@ -23,7 +23,6 @@ namespace GG.Publisher
 
             Dictionary<string, string> keyValuePairs = new Dictionary<string, string>();
             keyValuePairs.Add("key1", "value1");
-            //_publisher.Publish(new ConfigurationRequest("tenant", "giService", keyValuePairs, DateTimeOffset.UtcNow));
 
             await _publisher.PublishAsync(new RemoveConfiguration("tenant", "destination", "origin", keyValuePairs, true, DateTimeOffset.UtcNow), stoppingToken).ConfigureAwait(false);
 
